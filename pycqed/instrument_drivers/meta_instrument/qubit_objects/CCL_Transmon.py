@@ -19,7 +19,6 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement.calibration_toolbox import (
     mixer_carrier_cancellation, multi_channel_mixer_carrier_cancellation)
-from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_UHFQC_adaptive
 from pycqed.measurement.openql_experiments.openql_helpers import load_range_of_oql_programs
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
@@ -34,9 +33,10 @@ class CCLight_Transmon(Qubit):
     '''
     The CCLight_Transmon
     Setup configuration:
-        Drive:                 CCLight controlling AWG8's and a VSM
-        Acquisition:           UHFQC
-        Readout pulse configuration: LO modulated using UHFQC AWG
+        Central controller:    CCLight 
+        single-qubit drive:    AWG8 or QWG via the mw lutman, VSM is optional
+        Acquisition:           via the readout acquisition lutman
+        Readout pulse configuration: LO modulated using readout pulse lutman
     '''
 
     def __init__(self, name, **kw):
@@ -441,7 +441,7 @@ class CCLight_Transmon(Qubit):
         # TODO: add docstring (Oct 2017)
         self.add_parameter('cfg_prepare_ro_awg', vals=vals.Bool(),
                            docstring=('If False disables uploading pusles '
-                                      'to UHFQC'),
+                                      'to the readout AWG'),
                            initial_value=True,
                            parameter_class=ManualParameter)
 
@@ -512,10 +512,10 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
     def prepare_for_continuous_wave(self):
-        if self.ro_acq_weight_type() not in {'DSB', 'SSB'}:
+        if self.instr_LutMan_Acq.get_instr().weight_type() not in {'DSB', 'SSB'}:
             # this is because the CW acquisition detects using angle and phase
             # and this requires two channels to rotate the signal properly.
-            raise ValueError('Readout "{}" '.format(self.ro_acq_weight_type())
+            raise ValueError('Readout "{}" '.format(self.instr_LutMan_Acq.get_instr().weight_type())
                              + 'weight type must be "SSB" or "DSB"')
         self.prepare_readout()
         self._prep_cw_spec()
@@ -534,16 +534,22 @@ class CCLight_Transmon(Qubit):
         - generate the RO pulse
         - set the integration weights
         """
-        self.instr_LutMan_Acq.get_instr().instantiate_single_qubit_detectors(
-            CC=self.instr_CC.get_instr())
+        #inistiantiate detectors
+        self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
         if self.cfg_prepare_ro_awg():
             self._prep_ro_pulse()
-            self.instr_LutMan_Acq.get_instr().load_waveform_onto_instr(
-                self.cfg_qubit_nr(), regenerate_waveforms=True)
 
     def _prep_ro_instantiate_detectors(self):
         self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())
+        self.instr_LutMan_Acq.get_instr().instantiate_single_qubit_detectors(
+            CC=self.instr_CC.get_instr(), qubit_nr = self.cfg_qubit_nr())
+        self.int_avg_det = self.instr_LutMan_Acq.get_instr()._int_avg_det
+        self.int_avg_det_single = self.instr_LutMan_Acq.get_instr()._int_avg_det_single
+        self.input_averag_detector = self.instr_LutMan_Acq.get_instr()._input_avg_det
+        self.int_log_det = self.instr_LutMan_Acq.get_instr()._int_log_det
+        self.single_qubit_statistics_logging_det = self.instr_LutMan_Acq.get_instr()._single_qubit_statistics_logging_det
+        
 
     def _prep_ro_sources(self):
         LO = self.instr_LO_ro.get_instr()
@@ -578,12 +584,11 @@ class CCLight_Transmon(Qubit):
             ro_pulse_mixer_offs_Q
 
         """
-        if 'UHFQC' not in self.instr_acquisition():
-            raise NotImplementedError()
-        UHFQC = self.instr_acquisition.get_instr()
-
         if 'gated' in self.ro_pulse_type().lower():
-            UHFQC.awg_sequence_acquisition()
+            if 'UHFQC' not in self.instr_LutMan_Acq.get_instr().instr():
+                raise NotImplementedError()
+            acq_instr = self.instr_LutMan_Acq.get_instr().instr.get_instr()
+            acq_instr.awg_sequence_acquisition() #standard sequence for vsm_gated readout, no readout pulse lutman is required
 
         else:
             ro_lm = self.instr_LutMan_RO.get_instr()
@@ -619,7 +624,7 @@ class CCLight_Transmon(Qubit):
 
             ro_lm.acquisition_delay(self.ro_acq_delay())
             if upload:
-                ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
+                ro_lm.load_DIO_triggered_sequence()
             #setting the pulse mixer offsets
             ro_lm.mixer_offs_I(self.ro_pulse_mixer_offs_I())
             ro_lm.mixer_offs_Q(self.ro_pulse_mixer_offs_Q())
@@ -766,7 +771,7 @@ class CCLight_Transmon(Qubit):
         Note: there are two VSM markers, align with the first of two.
 
         By changing the "mw_vsm_delay" parameter the delay can be calibrated.
-        N.B. Ensure that the signal is visible on a scope or in the UFHQC
+        N.B. Ensure that the signal is visible on a scope or in the acquisition
         readout first!
         """
         self.prepare_for_timedomain()
@@ -912,7 +917,6 @@ class CCLight_Transmon(Qubit):
 
     def calibrate_mixer_skewness_RO(self, update=True):
         '''
-        Calibrates the mixer skewness using mixer_skewness_cal_UHFQC_adaptive
         see calibration toolbox for details
         '''
 
@@ -928,9 +932,9 @@ class CCLight_Transmon(Qubit):
         LutMan = self.instr_LutMan_RO.get_instr()
         LutMan.mixer_apply_predistortion_matrix(True)
         MC = self.instr_MC.get_instr()
-        S1 = swf.lutman_par_UHFQC_dig_trig(
+        S1 = swf.lutman_par_dig_trig(
             LutMan, LutMan.mixer_alpha, single=False, run=True)
-        S2 = swf.lutman_par_UHFQC_dig_trig(
+        S2 = swf.lutman_par_dig_trig(
             LutMan, LutMan.mixer_phi, single=False, run=True)
 
         detector = det.Signal_Hound_fixed_frequency(
@@ -1025,7 +1029,7 @@ class CCLight_Transmon(Qubit):
         ro_lm = self.instr_LutMan_RO.get_instr()
         m_amp_par = ro_lm.parameters[
             'M_amp_R{}'.format(self.cfg_qubit_nr())]
-        s2 = swf.lutman_par_dB_attenuation_UHFQC_dig_trig(
+        s2 = swf.lutman_par_dB_attenuation_dig_trig(
             LutMan=ro_lm, LutMan_parameter=m_amp_par)
         MC.set_sweep_function_2D(s2)
         MC.set_sweep_points_2D(powers)
@@ -1146,8 +1150,9 @@ class CCLight_Transmon(Qubit):
                      verbose: bool=True,
                      SNR_detector: bool=False,
                      cal_residual_excitation: bool=False):
-        old_RO_digit = self.ro_acq_digitized()
-        self.ro_acq_digitized(False)
+        acq_lutman = self.instr_LutMan_Acq.get_instr()
+        old_RO_digit = acq_lutman.digitized()
+        acq_lutman.digitized(False)
         # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1167,7 +1172,7 @@ class CCLight_Transmon(Qubit):
 
         # digitization setting is reset here but the detector still uses
         # the disabled setting that was set above
-        self.ro_acq_digitized(old_RO_digit)
+        acq_lutman.digitized(old_RO_digit)
 
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
@@ -1197,7 +1202,7 @@ class CCLight_Transmon(Qubit):
             else:
                 if len(d.value_names) == 1:
                     if post_select_threshold == None:
-                        post_select_threshold = self.ro_acq_threshold()
+                        post_select_threshold = acq_lutman.get('R{}_digitized_threshold'.format(self.cfg_qubit_nr))
                     a = ma2.Singleshot_Readout_Analysis(
                         t_start=None, t_stop=None,
                         label='SSRO',
@@ -1206,11 +1211,12 @@ class CCLight_Transmon(Qubit):
                                       'post_select_threshold': post_select_threshold},
                         extract_only=no_figs)
                     if update_threshold:
-                        # UHFQC threshold is wrong, the magic number is a
-                        #  dirty hack. This works. we don't know why.
-                        magic_scale_factor = 1  # 0.655
-                        self.ro_acq_threshold(a.proc_data_dict['threshold_raw'] *
-                                              magic_scale_factor)
+                        # previously, issues with the thresholding have led to
+                        #using a non-1 magic scale factor to fix thresholding.
+                        magic_scale_factor = 1  # 1
+                        threshold = a.proc_data_dict['threshold_raw']
+                        acq_lutman.set('R{}_digitized_threshold'.format(self.cfg_qubit_nr), 
+                                            threshold*magic_scale_factor)
                     if update:
                         self.F_ssro(a.proc_data_dict['F_assignment_raw'])
                         self.F_discr(a.proc_data_dict['F_discr'])
@@ -1261,10 +1267,9 @@ class CCLight_Transmon(Qubit):
                                  upload=prepare)
             MC.set_sweep_function(s)
 
-            if 'UHFQC' in self.instr_acquisition():
-                sampling_rate = 1.8e9
-            else:
-                raise NotImplementedError()
+
+            sampling_rate = self.instr_LutMan_Acq.get_instr().sampling_rate()
+
             MC.set_sweep_points(
                 np.arange(self.input_average_detector.nr_samples) /
                 sampling_rate)
@@ -1292,15 +1297,15 @@ class CCLight_Transmon(Qubit):
             MC = self.instr_MC.get_instr()
 
         # Ensure that enough averages are used to get accurate weights
-        old_avg = self.ro_acq_averages()
+        old_avg = self.instr_LutMan_Acq.get_instr().averages()
 
-        self.ro_acq_averages(2**15)
+        self.instr_LutMan_Acq.get_instr().averages(2**15)
         transients = self.measure_transients(MC=MC, analyze=analyze,
                                              depletion_analysis=False)
         if analyze:
             ma.Input_average_analysis(IF=self.ro_freq_mod())
 
-        self.ro_acq_averages(old_avg)
+        self.instr_LutMan_Acq.get_instr().averages(old_avg)
 
         # Calculate optimal weights
         optimized_weights_I = (transients[1][0] - transients[0][0])
@@ -1309,7 +1314,7 @@ class CCLight_Transmon(Qubit):
         maxI = np.max(np.abs(optimized_weights_I))
         maxQ = np.max(np.abs(optimized_weights_Q))
         # fixme: deviding the weight functions by four to not have overflow in
-        # thresholding of the UHFQC
+        # thresholding 
         weight_scale_factor = 1./(4*np.max([maxI, maxQ]))
         optimized_weights_I = np.array(
             weight_scale_factor*optimized_weights_I)
@@ -1322,7 +1327,7 @@ class CCLight_Transmon(Qubit):
                 self.cfg_qubit_nr), optimized_weights_I)
             acq_lutman.set('R{}_opt_weights_Q'.format(
                 self.cfg_qubit_nr), optimized_weights_Q)
-            self.ro_acq_weight_type('optimal')
+            self.instr_LutMan_Acq.get_instr().weight_type('optimal')
 
         if verify:
             self.measure_ssro(
@@ -1520,12 +1525,7 @@ class CCLight_Transmon(Qubit):
         # Preparing the sequence
         if restless:
             net_clifford = 3
-            d = det.UHFQC_single_qubit_statistics_logging_det(
-                self.instr_acquisition.get_instr(),
-                self.instr_CC.get_instr(), nr_shots=4*4095,
-                integration_length=self.ro_acq_integration_length(),
-                channel=self.ro_acq_weight_chI(),
-                statemap={'0': '1', '1': '0'})
+            d = self.single_qubit_statistics_logging_det
             minimize = False
             msmt_string = 'Restless_tuneup_{}Cl_{}seeds'.format(
                 nr_cliffords, nr_seeds) + self.msmt_suffix
@@ -1731,7 +1731,7 @@ class CCLight_Transmon(Qubit):
         # The analysis counts single errors. The definition of an error is
         # adapted automatically by choosing feedback or the net_gate.
         # it requires high SNR single shot readout and a calibrated threshold
-        self.ro_acq_digitized(True)
+        self.instr_LutMan_Acq.get_instr().digitized(True)
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -2051,7 +2051,7 @@ class CCLight_Transmon(Qubit):
 
         MC.run('Motzoi_XY'+self.msmt_suffix)
         if analyze:
-            if self.ro_acq_weight_type() == 'optimal':
+            if self.instr_LutMan_Acq.get_instr().weight_type() == 'optimal':
                 a = ma2.Intersect_Analysis(
                     options_dict={'ch_idx_A': 0,
                                   'ch_idx_B': 1})
@@ -2269,8 +2269,8 @@ class CCLight_Transmon(Qubit):
 
         d = RO_lutman.get('M_final_delay_R{}'.format(self.cfg_qubit_nr()))
         self.ro_acq_delay(old_delay + readout_pulse_length + d)
-        self.ro_acq_integration_length(readout_pulse_length+100e-9)
-        self.ro_acq_weight_type('SSB')
+        self.instr_LutMan_Acq.get_instr().integration_length(readout_pulse_length+100e-9)
+        self.instr_LutMan_Acq.get_instr().weight_type('SSB')
         self.prepare_for_timedomain()
         old_ro_prepare_state = self.cfg_prepare_ro_awg()
         self.cfg_prepare_ro_awg(False)
@@ -2363,7 +2363,7 @@ class CCLight_Transmon(Qubit):
         readout_pulse_length = self.ro_pulse_length()
         readout_pulse_length += self.ro_pulse_down_length0()
         readout_pulse_length += self.ro_pulse_down_length1()
-        self.ro_acq_integration_length(readout_pulse_length+100e-9)
+        self.instr_LutMan_Acq.get_instr().integration_length(readout_pulse_length+100e-9)
 
         # calibrate optimal weights
         self.calibrate_optimal_weights(verify=False)

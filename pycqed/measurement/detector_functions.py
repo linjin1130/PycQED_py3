@@ -1470,8 +1470,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         result_logging_mode (str) :  options are
             - raw        -> returns raw data in V
-            - lin_trans  -> applies the linear transformation matrix and
-                            subtracts the offsets defined in the UFHQC.
+            - lin_trans  -> applies the linear transformation matrix 
+                            defined in the UFHQC.
                             This is typically used for crosstalk suppression
                             and normalization. Requires optimal weights.
             - digitized  -> returns fraction of shots based on the threshold
@@ -1613,11 +1613,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data = np.array([data_raw[key]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
 
-        # Corrects offsets after crosstalk suppression matrix in UFHQC
-        if self.result_logging_mode == 'lin_trans':
-            for i, channel in enumerate(self.channels):
-                data[i] = data[i]-self.UHFQC.get(
-                    'quex_trans_offset_weightfunction_{}'.format(channel))
         if not self.real_imag:
             data = self.convert_to_polar(data)
 
@@ -1902,8 +1897,8 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
         result_logging_mode (str):  options are
             - raw        -> returns raw data in V
-            - lin_trans  -> applies the linear transformation matrix and
-                            subtracts the offsets defined in the UFHQC.
+            - lin_trans  -> applies the linear transformation matrix defined in 
+                            the UFHQC.
                             This is typically used for crosstalk suppression
                             and normalization. Requires optimal weights.
             - digitized  -> returns fraction of shots based on the threshold
@@ -1961,12 +1956,6 @@ class UHFQC_integration_logging_det(Hard_Detector):
             samples=self.nr_shots, arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
-
-        # Corrects offsets after crosstalk suppression matrix in UFHQC
-        if self.result_logging_mode == 'lin_trans':
-            for i, channel in enumerate(self.channels):
-                data[i] = data[i]-self.UHFQC.get(
-                    'quex_trans_offset_weightfunction_{}'.format(channel))
         return data
 
     def prepare(self, sweep_points):
@@ -2170,8 +2159,6 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
                 e.g.:
                     statemap ={'0': '0', '1':'1'}
             channel_name (str) : optional name of the channel
-
-
         """
         super(UHFQC_statistics_logging_det, self).__init__()
         self.UHFQC = UHFQC

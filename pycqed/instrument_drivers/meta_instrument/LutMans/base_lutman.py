@@ -36,8 +36,7 @@ class Base_LutMan(Instrument):
         # FIXME: rename to instr to be consistent with other instr refs
         self.add_parameter(
             'instr', parameter_class=InstrumentRefParameter, docstring=(
-                "Name of the AWG or acquisition instrument used, note that this can also be "
-                "a UHFQC or a CBox as these also contain instr's"),
+                "Name of the AWG or acquisition instrument used"),
             vals=vals.Strings())
         self._add_cfg_parameters()
         self._add_waveform_parameters()

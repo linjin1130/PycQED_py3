@@ -188,9 +188,7 @@ class TwoQubitDevice(DeviceObject):
         self.prepare_for_timedomain()
 
         # Important that this happens before calibrating the weights
-        UHFQC.quex_trans_offset_weightfunction_0(0)
-        UHFQC.quex_trans_offset_weightfunction_1(0)
-        UHFQC.upload_transformation_matrix([[1, 0], [0, 1]])
+        UHFQC.upload_transformation_matrix([[1, 0], [0, 1]]) #note currently hardcoded to integration slots 0 and 1
 
         if calibrate_optimal_weights:
             q0.calibrate_optimal_weights(
@@ -204,12 +202,6 @@ class TwoQubitDevice(DeviceObject):
         res_dict = mra.two_qubit_ssro_fidelity(
             label='{}_{}'.format(q0.name, q1.name),
             qubit_labels=[q0.name, q1.name])
-        V_offset_cor = res_dict['V_offset_cor']
-
-        # weights 0 and 1 are the correct indices because I set the numbering
-        # at the start of this calibration script.
-        UHFQC.quex_trans_offset_weightfunction_0(V_offset_cor[0])
-        UHFQC.quex_trans_offset_weightfunction_1(V_offset_cor[1])
 
         # Does not work because axes are not normalized
         UHFQC.upload_transformation_matrix(res_dict['mu_matrix_inv'])
@@ -240,10 +232,6 @@ class TwoQubitDevice(DeviceObject):
             # do not use V_th_corr as this is measured from data that already
             # includes a correction matrix
             thres = a['V_th_d']
-
-            # correction for the offset (that is only applied in software)
-            # happens in the qubits objects in the prep for TD where the
-            # threshold is set in the UFHQC.
             q0.RO_threshold(thres[0])
             q1.RO_threshold(thres[1])
 

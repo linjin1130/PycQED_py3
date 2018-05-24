@@ -1,0 +1,8 @@
+PWD /Users/nbultink/GithubRepos/PycQED_py3/pycqed/instrument_drivers/meta_instrument/LutMans
+INPUT /usr/local/texlive/2015/texmf.cnf
+INPUT /usr/local/texlive/2015/texmf-dist/web2c/texmf.cnf
+INPUT /usr/local/texlive/2015/texmf-var/web2c/pdftex/pdflatex.fmt
+INPUT /Users/nbultink/GithubRepos/PycQED_py3/pycqed/instrument_drivers/meta_instrument/LutMans/acq_lutman.py
+OUTPUT /Users/nbultink/GithubRepos/PycQED_py3/pycqed/instrument_drivers/meta_instrument/LutMans/Output/acq_lutman.log
+OUTPUT /Users/nbultink/GithubRepos/PycQED_py3/pycqed/instrument_drivers/meta_instrument/LutMans/Output/acq_lutman.pdf
+INPUT /usr/local/texlive/2015/texmf-var/fonts/map/pdftex/updmap/pdftex.map

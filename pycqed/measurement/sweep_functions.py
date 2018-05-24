@@ -886,7 +886,7 @@ class lutman_par_dB_attenuation_UHFQC(Soft_Sweep):
             self.LutMan.UHFQC.acquisition_arm(single=self.single)
 
 
-class lutman_par_UHFQC_dig_trig(Soft_Sweep):
+class lutman_par_dig_trig(Soft_Sweep):
     def __init__(self, LutMan, LutMan_parameter, single=True, run=False,**kw):
         self.set_kw()
         self.name = LutMan_parameter.name
@@ -902,7 +902,7 @@ class lutman_par_UHFQC_dig_trig(Soft_Sweep):
         self.LutMan_parameter.set(val)
         if self.run:
             self.LutMan.AWG.get_instr().awgs_0_enable(False)
-        self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
+        self.LutMan.load_DIO_triggered_sequence_onto()
         if self.run:
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
@@ -947,10 +947,10 @@ class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
                 self.LutMan.set('M_down_amp0_R{}'.format(resonator_number), 0)
                 self.LutMan.set('M_down_amp1_R{}'.format(resonator_number), 0)
         if self.upload:
-            self.LutMan.load_DIO_triggered_sequence_onto_UHFQC(regenerate_waveforms=True)
+            self.LutMan.load_DIO_triggered_sequence(regenerate_waveforms=True)
 
 
-class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
+class lutman_par_dB_attenuation_dig_trig(Soft_Sweep):
     def __init__(self, LutMan, LutMan_parameter, run=False, **kw):
         self.set_kw()
         self.name = LutMan_parameter.name
@@ -965,12 +965,12 @@ class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
         self.LutMan_parameter.set(10**(val/20))
         if self.run:
             self.LutMan.AWG.get_instr().awgs_0_enable(False)
-        self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
+        self.LutMan.load_DIO_triggered_sequence()
         if self.run:
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
 
-class dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
+class dB_attenuation_dig_trig(Soft_Sweep):
     def __init__(self, LutMan, LutMan_parameter, run=False, **kw):
         self.set_kw()
         self.name = LutMan_parameter.name
@@ -985,7 +985,7 @@ class dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
         self.LutMan_parameter.set(10**(val/20))
         if self.run:
             self.LutMan.AWG.get_instr().awgs_0_enable(False)
-        self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
+        self.LutMan.load_DIO_triggered_sequence()
         if self.run:
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 

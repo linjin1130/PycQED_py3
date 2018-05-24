@@ -23,9 +23,7 @@ except ImportError:
     sqo = None
 
 from pycqed.analysis import tomography as tomo
-
 from collections import defaultdict
-
 
 class DeviceCCL(Instrument):
 
@@ -46,10 +44,9 @@ class DeviceCCL(Instrument):
                            initial_value=[[]],
                            vals=vals.Lists(elt_validator=vals.Lists()))
 
-        self.add_parameter(
-            'ro_lo_freq', unit='Hz',
-            docstring=('Frequency of the common LO for all RO pulses.'),
-            parameter_class=ManualParameter)
+        self.add_parameter('ro_lo_freq', unit='Hz',
+                          docstring=('Frequency of the common LO for all RO pulses.'),
+                          parameter_class=ManualParameter)
 
         # actually, it should be possible to build the integration
         # weights obeying different settings for different
@@ -276,16 +273,8 @@ class DeviceCCL(Instrument):
             if self.ro_acq_digitized():
                 # Update the RO theshold
                 acq_ch = qb.ro_acq_weight_chI()
-
-                # The threshold that is set in the hardware  needs to be
-                # corrected for the offset as this is only applied in
-                # software.
-                threshold = qb.ro_acq_threshold()
-                offs = qb.instr_acquisition.get_instr().get(
-                    'quex_trans_offset_weightfunction_{}'.format(acq_ch))
-                hw_threshold = threshold + offs
                 qb.instr_acquisition.get_instr().set(
-                    'quex_thres_{}_level'.format(acq_ch), hw_threshold)
+                    'quex_thres_{}_level'.format(acq_ch), qb.ro_acq_threshold())
 
     def get_correlation_detector(self, single_int_avg: bool =False,
                                  seg_per_point: int=1):
@@ -375,7 +364,6 @@ class DeviceCCL(Instrument):
             self._get_ro_channels_and_labels(self.qubits())
 
         if self.ro_acq_weight_type() == 'optimal':
-            # todo: digitized mode
             result_logging_mode = 'lin_trans'
             if self.ro_acq_digitized():
                 result_logging_mode = 'digitized'

@@ -248,8 +248,6 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         self._voltage_max = 1.0-1.0/2**13
         self.sampling_rate(1.8e9)
 
-
-
     def set_default_lutmap(self):
         """
         The LutMap parameter is not used for the UHFQC. Instead this is
@@ -258,7 +256,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         """
         self.LutMap({})
 
-    def load_single_pulse_sequence_onto_UHFQC(self, pulse_name,
+    def load_single_pulse_sequence(self, pulse_name,
                                               regenerate_waveforms=True):
         '''
         Load a single pulse to the lookuptable, it uses the lut_mapping to
@@ -276,7 +274,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         self.instr.get_instr().awg_sequence_acquisition_and_pulse(
             I_wave, Q_wave, self.acquisition_delay())
 
-    def load_DIO_triggered_sequence_onto_UHFQC(self,
+    def load_DIO_triggered_sequence(self,
                                                regenerate_waveforms=True,
                                                timeout=5):
         '''

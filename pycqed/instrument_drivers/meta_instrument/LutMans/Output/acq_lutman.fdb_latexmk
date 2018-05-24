@@ -1,0 +1,14 @@
+# Fdb version 3
+["pdflatex"] 1527149883 "/Users/nbultink/GithubRepos/PycQED_py3/pycqed/instrument_drivers/meta_instrument/LutMans/acq_lutman.py" "/Users/nbultink/GithubRepos/PycQED_py3/pycqed/instrument_drivers/meta_instrument/LutMans/Output/acq_lutman.pdf" "acq_lutman" 1527149883
+  "/Users/nbultink/GithubRepos/PycQED_py3/pycqed/instrument_drivers/meta_instrument/LutMans/Output/acq_lutman.aux" 1527149883 8 a94a2480d3289e625eea47cd1b285758 ""
+  "/Users/nbultink/GithubRepos/PycQED_py3/pycqed/instrument_drivers/meta_instrument/LutMans/acq_lutman.py" 1527149882 14173 f5eb212eebd3b1214b37126b37b3b607 ""
+  "/usr/local/texlive/2015/texmf-dist/web2c/texmf.cnf" 1428852030 31983 18aeec08f48baa3cf3508d538dd5f459 ""
+  "/usr/local/texlive/2015/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1432479641 1764542 91654ba72bdb667e84ea24f076ae16d8 ""
+  "/usr/local/texlive/2015/texmf-var/web2c/pdftex/pdflatex.fmt" 1442922654 3849859 bb622e3bc7b4c442d5af4c75851a5195 ""
+  "/usr/local/texlive/2015/texmf.cnf" 1432479636 577 0d611272082f3cdb8e80e09a3c69cf07 ""
+  "acq_lutman.py" 1527149882 14173 f5eb212eebd3b1214b37126b37b3b607 ""
+  (generated)
+  "Output/acq_lutman.log"
+  "Output/acq_lutman.pdf"
+  "/Users/nbultink/GithubRepos/PycQED_py3/pycqed/instrument_drivers/meta_instrument/LutMans/Output/acq_lutman.log"
+  "/Users/nbultink/GithubRepos/PycQED_py3/pycqed/instrument_drivers/meta_instrument/LutMans/Output/acq_lutman.pdf"
