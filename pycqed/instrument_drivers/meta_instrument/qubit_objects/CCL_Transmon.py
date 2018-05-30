@@ -543,7 +543,7 @@ class CCLight_Transmon(Qubit):
     def _prep_ro_instantiate_detectors(self):
         self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())
         self.instr_LutMan_Acq.get_instr().instantiate_single_qubit_detectors(
-            CC=self.instr_CC.get_instr(), qubit_nr = self.cfg_qubit_nr())
+            CC=self.instr_CC.get_instr(), qubit_nrs = [self.cfg_qubit_nr()])
         self.int_avg_det = self.instr_LutMan_Acq.get_instr()._int_avg_det
         self.int_avg_det_single = self.instr_LutMan_Acq.get_instr()._int_avg_det_single
         self.input_averag_detector = self.instr_LutMan_Acq.get_instr()._input_avg_det

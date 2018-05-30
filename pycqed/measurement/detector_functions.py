@@ -51,16 +51,20 @@ class Multi_Detector(Detector_Function):
     """
 
     def __init__(self, detectors: list,
-                 det_idx_suffix: bool=True, **kw):
+                 det_idx_suffix: bool=True, 
+                 name='Multi_detector',
+                 sort_args=None, 
+                 **kw):
         """
         detectors     (list): a list of detectors to combine.
         det_idx_suffix(bool): if True suffixes the value names with
                 "_det{idx}" where idx refers to the relevant detector.
         """
         self.detectors = detectors
-        self.name = 'Multi_detector'
+        self.name = name 
         self.value_names = []
         self.value_units = []
+        self.sort_args = sort_args
         for i, detector in enumerate(detectors):
             for detector_value_name in detector.value_names:
                 if det_idx_suffix:
@@ -74,6 +78,10 @@ class Multi_Detector(Detector_Function):
             if d.detector_control != self.detector_control:
                 raise ValueError('All detectors should be of the same type')
 
+        if sort_args!=None:
+            self.value_names = [self.value_names[i] for i in sort_args]
+            self.value_units = [self.value_units[i] for i in sort_args]
+
     def prepare(self, **kw):
         for detector in self.detectors:
             detector.prepare(**kw)
@@ -84,6 +92,8 @@ class Multi_Detector(Detector_Function):
             new_values = detector.get_values()
             values_list.append(new_values)
         values = np.concatenate(values_list)
+        if self.sort_args!=None:
+            values = [values[i] for i in sort_args]
         return values
 
     def acquire_data_point(self):
@@ -95,6 +105,8 @@ class Multi_Detector(Detector_Function):
         for detector in self.detectors:
             new_values = detector.acquire_data_point()
             values = np.append(values, new_values)
+        if self.sort_args!=None:
+            values = [values[i] for i in sort_args]
         return values
 
     def finish(self):
