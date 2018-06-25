@@ -803,6 +803,7 @@ ImagExpModel = lmfit.Model(ImagExpFunc)
 CosModel.guess = Cos_guess
 
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
+Qubit_dac_to_freqModel = lmfit.Model(Qubit_dac_to_freq)
 TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)
 ExpDecayModel.guess = exp_dec_guess  # todo: fix
 ExpDampOscModel = lmfit.Model(ExpDampOscFunc)
