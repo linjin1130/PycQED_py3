@@ -183,8 +183,8 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
         for j in range(js):
             k = Kernel("AllXY_"+str(i+j/2), p=platf)
             k.prepz(qubit_idx)
-            k.gate('fl_cw_02', 2, 0)
-            k.gate("wait", [qubit_idx,], 0)
+            # k.gate('fl_cw_02', 2, 0)
+            # k.gate("wait", [qubit_idx,], 0)
             k.gate(xy[0], qubit_idx)
             k.gate(xy[1], qubit_idx)
             k.measure(qubit_idx)
