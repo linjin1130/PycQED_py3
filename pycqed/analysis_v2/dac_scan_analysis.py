@@ -1,6 +1,7 @@
 '''
 Hacked together by Rene Vollmer
 '''
+import datetime
 
 import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
@@ -19,7 +20,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
                  data_file_path: str = None,
                  close_figs: bool = True,
                  options_dict: dict = None, extract_only: bool = False,
-                 do_fitting: bool = False,
+                 do_fitting: bool = True,
                  is_spectroscopy: bool = True,
                  extract_fitparams: bool = True,
                  temp_keys: dict = None,
@@ -38,7 +39,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
                             'freq': self.options_dict.get('sweep_points_key', 'sweep_points'),
                             'amp': self.options_dict.get('amp_key', 'amp'),
                             'phase': self.options_dict.get('phase_key', 'phase'),
-                            'dac': self.options_dict.get('dac_key', 'Instrument settings.fluxcurrent.VFCQ6'),
+                            'dac': self.options_dict.get('dac_key', 'Instrument settings.fluxcurrent.Q'),
                             }
         self.numeric_params = ['freq', 'amp', 'phase', 'dac']
 
@@ -69,18 +70,23 @@ class FluxFrequency(ba.BaseDataAnalysis):
         self.proc_data_dict = {}
         dac_values_unsorted = np.array(self.raw_data_dict['dac'])
         sorted_indices = dac_values_unsorted.argsort()
-        self.proc_data_dict['dac_values'] = np.array(dac_values_unsorted[sorted_indices], dtype=float)
-        self.proc_data_dict['amplitude_values'] = np.array(self.raw_data_dict['amp'][sorted_indices], dtype=float)
-        self.proc_data_dict['phase_values'] = np.array(self.raw_data_dict['phase'][sorted_indices], dtype=float)
-        self.proc_data_dict['frequency_values'] = np.array(self.raw_data_dict['freq'][sorted_indices], dtype=float)
-        self.proc_data_dict['datetime'] = np.array(self.raw_data_dict['datetime'])[sorted_indices]
+        self.proc_data_dict['dac_values'] = dac_values_unsorted[sorted_indices]
+
+        temp = {
+            'amp': 'amplitude_values',
+            'phase': 'phase_values',
+            'freq': 'frequency_values'
+        }
+        for k in temp:
+            self.proc_data_dict[temp[k]] = self._sort_by_axis0(self.raw_data_dict[k], sorted_indices)
+        self.proc_data_dict['datetime'] = [self.raw_data_dict['datetime'][i] for i in sorted_indices]
         # Do we have negative angles?
-        negative_angles = np.min(self.proc_data_dict['phase_values']) < 0
+        negative_angles = self._globalmin(self.proc_data_dict['phase_values']) < 0
         if negative_angles:
             tpi = np.pi
         else:
             tpi = 2 * np.pi
-        angle_type_deg_guess = np.max(np.abs(self.proc_data_dict['phase_values'])) > tpi
+        angle_type_deg_guess = np.max([np.max(np.abs(i)) for i in self.proc_data_dict['phase_values']]) > tpi
 
         if self.options_dict.get('phase_in_rad', False):
             deg_factor = 1
@@ -93,18 +99,17 @@ class FluxFrequency(ba.BaseDataAnalysis):
                 print('Warning: Assuming degrees as unit for Phase, but it might not be - '
                       + 'consider changing the  phase_in_rad entry in the options dict accordingly')
 
-        rad = self.proc_data_dict['phase_values'] * deg_factor
-        real = self.proc_data_dict['amplitude_values'] * np.cos(rad)
-        imag = self.proc_data_dict['amplitude_values'] * np.sin(rad)
+        rad = [i * deg_factor for i in self.proc_data_dict['phase_values']]
+        real = [self.proc_data_dict['amplitude_values'][j] * np.cos(i) for j, i in enumerate(rad)]
+        imag = [self.proc_data_dict['amplitude_values'][j] * np.sin(i) for j, i in enumerate(rad)]
         self.proc_data_dict['distance_values'] = [a_tools.calculate_distance_ground_state(
             data_real=real[i], data_imag=imag[i], percentile=self.options_dict.get('s21_percentile', 70),
             normalize=self.options_dict.get('s21_normalize_per_dac', False)) for i, v in
             enumerate(self.proc_data_dict['dac_values'])]
 
         if self.options_dict.get('s21_normalize_global', True):
-            temp = self.proc_data_dict['distance_values'] = self.proc_data_dict['distance_values']
-            temp = temp / np.max(temp)
-            del temp
+            self.proc_data_dict['distance_values'] = [temp / np.max(temp) for temp in
+                                                      self.proc_data_dict['distance_values']]
 
         if self.extract_fitparams:
             corr_f = self.options_dict.get('fitparams_corr_fact', 1)
@@ -116,48 +121,45 @@ class FluxFrequency(ba.BaseDataAnalysis):
 
         # Smooth data and find peeks
         smooth = self.options_dict.get('smoothing', False)
-        for i, dac_value in enumerate(self.proc_data_dict['dac_values']):
-            peaks_x, peaks_z, smoothed_z = a_tools.peak_finder_v3(self.proc_data_dict['frequency_values'][i],
-                                                                  self.proc_data_dict['amplitude_values'][i],
-                                                                  smoothing=smooth,
-                                                                  perc=self.options_dict.get('preak_perc', 99),
-                                                                  window_len=self.options_dict.get('smoothing_win_len',
-                                                                                                   False),
-                                                                  factor=self.options_dict.get('data_factor', 1))
-            self.proc_data_dict['amplitude_values_smooth'][i] = smoothed_z
-            peaks_x, peaks_z, smoothed_z = a_tools.peak_finder_v3(self.proc_data_dict['frequency_values'][i],
-                                                                  self.proc_data_dict['phase_values'][i],
-                                                                  smoothing=smooth,
-                                                                  perc=self.options_dict.get('preak_perc', 99),
-                                                                  window_len=self.options_dict.get('smoothing_win_len',
-                                                                                                   False),
-                                                                  factor=self.options_dict.get('data_factor', 1))
-            self.proc_data_dict['phase_values_smooth'][i] = smoothed_z
-            peaks_x, peaks_z, smoothed_z = a_tools.peak_finder_v3(self.proc_data_dict['frequency_values'][i],
-                                                                  self.proc_data_dict['distance_values'][i],
-                                                                  smoothing=smooth,
-                                                                  perc=self.options_dict.get('preak_perc', 99),
-                                                                  window_len=self.options_dict.get('smoothing_win_len',
-                                                                                                   False),
-                                                                  factor=self.options_dict.get('data_factor', 1))
-            self.proc_data_dict['distance_values_smooth'][i] = smoothed_z
+        freqs = self.proc_data_dict['frequency_values']
+        for k in ['amplitude_values', 'phase_values', 'distance_values']:
+            self.proc_data_dict[k + '_smooth'] = {}
+            for i, dac_value in enumerate(self.proc_data_dict['dac_values']):
+                peaks_x, peaks_z, smoothed_z = a_tools.peak_finder_v3(freqs[i],
+                                                                      self.proc_data_dict[k][i],
+                                                                      smoothing=smooth,
+                                                                      perc=self.options_dict.get('peak_perc', 99),
+                                                                      window_len=self.options_dict.get(
+                                                                          'smoothing_win_len',
+                                                                          False),
+                                                                      factor=self.options_dict.get('data_factor', 1))
+                self.proc_data_dict[k + '_smooth'][i] = smoothed_z
 
-            # Fixme: save peaks
+                # Fixme: save peaks
 
     def run_fitting(self):
+        # This is not the proper way to do this!
+        # TODO: move this to prepare_fitting and write the fit_dicts dict accordingly
         self.fit_dicts = {}
         self.fit_result = {}
-        if self.is_spectroscopy:
-            fitfunc = Qubit_dac_to_freq
-            guessfunc = Qubit_dac_arch_guess
-        else:
-            fitfunc = Resonator_dac_to_freq
-            guessfunc = Resonator_dac_arch_guess
+
         dac_vals = self.proc_data_dict['dac_values']
         freq_vals = self.proc_data_dict['fit_frequencies']
-        fitmod = lmfit.Model(fitfunc)
-        fitmod.guess = guessfunc.__get__(fitmod, fitmod.__class__)
-        fitmod.guess(freq=freq_vals, dac_voltage=dac_vals)
+
+        f_q = self.options_dict.get('qubit_freq', None)
+        ext = f_q is not None
+        if self.is_spectroscopy:
+            fitmod = lmfit.Model(Qubit_dac_to_freq)
+            fitmod.guess = Qubit_dac_arch_guess.__get__(fitmod, fitmod.__class__)
+            fitmod.guess(freq=freq_vals, dac_voltage=dac_vals)
+        else:
+            if f_q is None and self.verbose:
+                print('Specify qubit_freq in the options_dict to obtain a better fit!')
+                # Todo: provide alternative fit?
+            fitmod = lmfit.Model(Resonator_dac_to_freq)
+            fitmod.guess = Resonator_dac_arch_guess.__get__(fitmod, fitmod.__class__)
+            fitmod.guess(freq=freq_vals, dac_voltage=dac_vals, f_max_qubit=f_q)
+
         fit_result = fitmod.fit(freq_vals, dac_voltage=dac_vals)
 
         self.fit_result['dac_arc'] = fit_result
@@ -167,6 +169,9 @@ class FluxFrequency(ba.BaseDataAnalysis):
         else:
             f0 = fit_result.params['f_max_qubit']
 
+        # TODO: This is very dirty code! Derived values like E_J should be set as
+        # fitmod.set_param_hint('E_J', expr='(f0 ** 2 + 2 * EC * f0 + EC ** 2) / (8 * EC)', vary=False)
+        # And fit_dicts is used completely wrong (see above).
         self.fit_dicts['E_C'] = EC.value
         self.fit_dicts['E_J'] = (f0.value ** 2 + 2 * EC.value * f0.value + EC.value ** 2) / (8 * EC.value)
         self.fit_dicts['f_sweet_spot'] = f0.value
@@ -219,6 +224,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
             s = 'Resonator'
 
         twoDPlot = {'plotfn': self.plot_colorx,
+                    'zorder': 0,
                     'xvals': x,
                     'yvals': y,
                     'title': 'Flux Current ' + s + ' Sweep',
@@ -227,8 +233,8 @@ class FluxFrequency(ba.BaseDataAnalysis):
                     'ylabel': r'Frequency',
                     'yunit': 'Hz',
                     # 'zrange': [smoothed_amplitude_values.min(), smoothed_amplitude_values.max()],
-                    'xrange': [np.min(x), np.max(x)],
-                    'yrange': [np.min(y), np.max(y)],
+                    # 'xrange': [self._globalmin(x), self._globalmax(x)],
+                    # 'yrange': [self._globalmin(y), self._globalmax(y)],
                     'plotsize': self.options_dict.get('plotsize', None),
                     'cmap': self.options_dict.get('cmap', 'YlGn_r'),
                     'plot_transpose': self.options_dict.get('plot_transpose', False),
@@ -236,6 +242,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
 
         scatter = {
             'plotfn': self.plot_line,
+            'zorder': 5,
             'xvals': self.proc_data_dict['dac_values'],
             'yvals': self.proc_data_dict['fit_frequencies'],
             'marker': 'x',
@@ -246,13 +253,15 @@ class FluxFrequency(ba.BaseDataAnalysis):
             fit_result = self.fit_result['dac_arc']
             fit = {
                 'plotfn': self.plot_fit,
+                'zorder': 10,
                 'fit_res': fit_result,
-                'xvals': self.proc_data_dict['dac_values'],
+                'xvals': self.proc_data_dict['dac_values'] * cm,
                 'yvals': self.proc_data_dict['fit_frequencies'],
                 'marker': '',
                 'linestyle': '-',
             }
 
+        ext = self.options_dict.get('qubit_freq', None) is not None
         for ax in ['amplitude', 'phase', 'distance']:
             z = self.proc_data_dict['%s_values' % ax]
             td = deepcopy(twoDPlot)
@@ -270,17 +279,20 @@ class FluxFrequency(ba.BaseDataAnalysis):
             td['ax_id'] = ax
             self.plot_dicts[ax] = td
 
-            sc = deepcopy(scatter)
-            sc['ax_id'] = ax
-            self.plot_dicts[ax + '_scatter'] = sc
+            if self.options_dict.get('show_fitted_peaks', True):
+                sc = deepcopy(scatter)
+                sc['ax_id'] = ax
+                self.plot_dicts[ax + '_scatter'] = sc
 
             if self.do_fitting:
                 f = deepcopy(fit)
                 f['ax_id'] = ax
                 self.plot_dicts[ax + '_fit'] = f
 
-            if self.options_dict.get('print_fit_result_plot', True):
-                dac_fit_text = '$E_C/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (
+            if hasattr(self, 'fit_dicts') and self.options_dict.get('print_fit_result_plot', True):
+                dac_fit_text = ''
+                # if ext or self.is_spectroscopy:
+                dac_fit_text += '$E_C/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (
                     self.fit_dicts['E_C'] * 1e-6, self.fit_dicts['E_C_std'] * 1e-6)
                 dac_fit_text += '$E_J/\hbar = %.2f$ GHz\n' % (
                         self.fit_dicts['E_J'] * 1e-9)  # , self.fit_dicts['E_J_std'] * 1e-9
@@ -292,6 +304,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
                 dac_fit_text += '$I/\Phi_0 = %.2f(\pm %.3f)$ mA/$\Phi_0$' % (
                     self.fit_dicts['dac_per_phi0'] * custom_multiplier * 1e3,
                     self.fit_dicts['dac_per_phi0_std'] * custom_multiplier * 1e3)
+
                 if not self.is_spectroscopy:
                     dac_fit_text += '\n$g/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (
                         self.fit_dicts['coupling'] * 1e-6, self.fit_dicts['coupling_std'] * 1e-6)

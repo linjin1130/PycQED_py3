@@ -13,9 +13,56 @@ except ImportError as e:
     pass
     # logging.warning('Could not import qutip, tomo code will not work')
 
-class ExpectationValueCalculation:
+def reshape_block(shots_data, segments_per_block=16, block_size=4092, mode='truncate'):
+    """
+    inputs: shots_data 1D array of dimension N
+    organizes data in blocks of dimension block_size.
+    num of blocks is N/block_size
+    """
+    N = len(shots_data)
+    # Data dimension needs to be an integer multiple of block_size
+    assert(N%block_size==0)
+    num_blocks = N//block_size
+    full_segments = block_size//segments_per_block
+    orfan_segments = block_size % segments_per_block
+    missing_segments = segments_per_block - orfan_segments
+#     print(N,num_blocks,full_segments,orfan_segments,missing_segments)
+    reshaped_data = shots_data.reshape((num_blocks,block_size))
+    if mode.lower()=='truncate':
+        truncate_idx = full_segments*segments_per_block
+        return reshaped_data[:,:truncate_idx]
+    elif mode.lower()=='padd':
+        padd_dim = (full_segments+1)*segments_per_block
+        return_block = np.nan*np.ones((num_blocks,padd_dim))
+        return_block[:,:block_size] = reshaped_data
+        return return_block
+    else:
+        raise ValueError('Mode not understood. Needs to be truncate or padd')
 
-    def __init__(self, nr_segments = 34, auto=True, label='', timestamp=None,
+def all_repetitions(shots_data,segments_per_block=16):
+    flat_dim = shots_data.shape[0]*shots_data.shape[1]
+    # Data dimension needs to divide the segments_per_block
+    assert(flat_dim%segments_per_block==0)
+    num_blocks = flat_dim // segments_per_block
+    block_data = shots_data.reshape((num_blocks,segments_per_block))
+    return block_data
+
+def get_segments_average(shots_data, segments_per_block=16, block_size=4092, mode='truncate', average=True):
+    reshaped_data = reshape_block(shots_data=shots_data,
+                                      segments_per_block=segments_per_block,
+                                      block_size=block_size,
+                                      mode=mode)
+    all_reps = all_repetitions(shots_data=reshaped_data,
+                                       segments_per_block=segments_per_block)
+    if average:
+        return np.mean(all_reps,axis=0)
+    else:
+        return all_reps
+
+
+class ExpectationValueCalculation_mmt_computer:
+
+    def __init__(self, auto=True, label='', timestamp=None,
                  fig_format='png',
                  q0_label='q0',
                  q1_label='q1', close_fig=True, **kw):
@@ -33,7 +80,7 @@ class ExpectationValueCalculation:
         # self.get_naming_and_values()
         # hard coded number of segments for a 2 qubit state tomography
         # constraint imposed by UHFLI
-        self.nr_segments = nr_segments
+        self.nr_segments = 16
         # self.exp_name = os.path.split(self.folder)[-1][7:]
 
         avg_h1 = self.ma_obj.measured_values[0]
@@ -54,94 +101,27 @@ class ExpectationValueCalculation:
         h12_10 = np.mean(avg_h12[50:50+7])
         h12_11 = np.mean(avg_h12[57:])
 
-        mean_h1 = (h1_00+h1_10+h1_01+h1_11)/4
-        mean_h2 = (h2_00+h2_01+h2_10+h2_11)/4
-        mean_h12 = (h12_00+h12_11+h12_01+h12_10)/4
+        measurement_channel_1 = np.array([avg_h1[0], avg_h1[1], avg_h1[7],
+                                          avg_h1[8], avg_h1[14], avg_h1[21],
+                                          avg_h1[28], avg_h1[35]])
+        measurement_channel_2 = np.array([avg_h2[0], avg_h2[1], avg_h2[7], avg_h2[8],
+                                          avg_h2[14], avg_h2[21], avg_h2[28], avg_h2[35]])
+        measurement_channel_3 = np.array([avg_h12[0], avg_h12[1], avg_h12[7],
+                                          avg_h12[8], avg_h12[14], avg_h12[21],
+                                          avg_h12[28],avg_h12[35]])
+        self.measurements_tomo = np.array([measurement_channel_1,
+                                           measurement_channel_2,
+                                           measurement_channel_3]).flatten()
+        # print(self.measurements_tomo)
+        # print(len(self.measurements_tomo))
 
-        avg_h1 -= mean_h1
-        avg_h2 -= mean_h2
-        avg_h12 -= mean_h12
-
-        scale_h1 = (h1_00+h1_10-h1_01-h1_11)/4
-        scale_h2 = (h2_00+h2_01-h2_10-h2_11)/4
-        scale_h12 = (h12_00+h12_11-h12_01-h12_10)/4
-        std_h1_00 = np.std(avg_h1[36:36+7])
-        std_h1_01 = np.std(avg_h1[43:43+7])
-        std_h1_10 = np.std(avg_h1[50:50+7])
-        std_h1_11 = np.std(avg_h1[57:])
-
-        std_h2_00 = np.std(avg_h2[36:36+7])
-        std_h2_01 = np.std(avg_h2[43:43+7])
-        std_h2_10 = np.std(avg_h2[50:50+7])
-        std_h2_11 = np.std(avg_h2[57:])
-
-        std_h12_00 = np.std(avg_h12[36:36+7])
-        std_h12_01 = np.std(avg_h12[43:43+7])
-        std_h12_10 = np.std(avg_h12[50:50+7])
-        std_h12_11 = np.std(avg_h12[57:])
-
-        std_h1 = np.mean([std_h1_00, std_h1_01, std_h1_10, std_h1_11])
-        std_h2 = np.mean([std_h2_00, std_h2_01, std_h2_10, std_h2_11])
-        std_h12 = np.mean([std_h12_00, std_h12_01, std_h12_10, std_h12_11])
-        std_arr = np.array([std_h1_00, std_h1_01, std_h1_10, std_h1_11, std_h2_00, std_h2_01,
-                            std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
-
-        fac = np.mean([std_h1, std_h2, std_h12])
-        avg_h1 *= fac/std_h1
-        avg_h2 *= fac/std_h2
-        avg_h12 *= fac/std_h12
-
-        # # key for next step
-        h1_00 = np.mean(avg_h1[36:36+7])
-        h1_01 = np.mean(avg_h1[43:43+7])
-        h1_10 = np.mean(avg_h1[50:50+7])
-        h1_11 = np.mean(avg_h1[57:])
-
-        h2_00 = np.mean(avg_h2[36:36+7])
-        h2_01 = np.mean(avg_h2[43:43+7])
-        h2_10 = np.mean(avg_h2[50:50+7])
-        h2_11 = np.mean(avg_h2[57:])
-
-        h12_00 = np.mean(avg_h12[36:36+7])
-        h12_01 = np.mean(avg_h12[43:43+7])
-        h12_10 = np.mean(avg_h12[50:50+7])
-        h12_11 = np.mean(avg_h12[57:])
-        segments = [0,#II
-            1,#IZ
-            6,#ZI
-            7,#ZZ
-            14,#yy
-            21,#-y-y
-            28,#xx
-            35]#-x-x
-        measurement_channel_1 = avg_h1[segments]
-        measurement_ch_average_1 = np.zeros(6)
-        measurement_ch_average_1[:4] = measurement_channel_1[:4]
-        measurement_ch_average_1[4] = (measurement_channel_1[4] + measurement_channel_1[5])/2
-        measurement_ch_average_1[5] = (measurement_channel_1[6] + measurement_channel_1[7])/2
-
-
-        measurement_channel_2 = avg_h2[segments]
-        measurement_ch_average_2 = np.zeros(6)
-        measurement_ch_average_2[:4] = measurement_channel_2[:4]
-        measurement_ch_average_2[4] = (measurement_channel_2[4] + measurement_channel_2[5])/2
-        measurement_ch_average_2[5] = (measurement_channel_2[6] + measurement_channel_2[7])/2
-
-
-        measurement_channel_3 = avg_h12[segments]
-        measurement_ch_average_3 = np.zeros(6)
-        measurement_ch_average_3[:4] = measurement_channel_3[:4]
-        measurement_ch_average_3[4] = (measurement_channel_3[4] + measurement_channel_3[5])/2
-        measurement_ch_average_3[5] = (measurement_channel_3[6] + measurement_channel_3[7])/2
-
-        # measurements_tomo is a len 24 array
-        self.measurements_tomo = np.array([measurement_ch_average_1,
-                                      measurement_ch_average_2,
-                                      measurement_ch_average_3]).flatten()
-
-        self.measurements_cal = np.array([h1_00, h1_01, h1_10, h1_11, h2_00, h2_01, h2_10, h2_11, h12_00, h12_01, h12_10, h12_11]).flatten()
-
-        self.plot_TV_mode(avg_h1, avg_h2, avg_h12)
+        # 108 x 1
+        # get the calibration points by averaging over the five measurements
+        # taken knowing the initial state we put in
+        self.measurements_cal = np.array(
+            [h1_00, h1_01, h1_10, h1_11,
+             h2_00, h2_01, h2_10, h2_11,
+             h12_00, h12_01, h12_10, h12_11])
 
     def _calibrate_betas(self):
         """
@@ -175,9 +155,6 @@ class ExpectationValueCalculation:
         betas[8:] = np.dot(np.linalg.inv(cal_matrix),
                            self.measurements_cal[8:12])
         self.betas_pp = betas[8:]
-        #statement to plot betas
-        #do not plot beta_II if it is close to zero
-
         return betas
 
     def assemble_M_matrix_single_block(self, beta_array):
@@ -329,7 +306,7 @@ class ExpectationValueCalculation:
         avg_h12 = self.ma_obj.measured_values[2]
 
         #this should be implemented with a flag
-        #but
+        #but 
         h1_00 = np.mean(avg_h1[36:36+7])
         h1_01 = np.mean(avg_h1[43:43+7])
         h1_10 = np.mean(avg_h1[50:50+7])
@@ -345,7 +322,7 @@ class ExpectationValueCalculation:
         h12_10 = np.mean(avg_h12[50:50+7])
         h12_11 = np.mean(avg_h12[57:])
 
-
+        
         mean_h1 = (h1_00+h1_10+h1_01+h1_11)/4
         mean_h2 = (h2_00+h2_01+h2_10+h2_11)/4
         mean_h12 = (h12_00+h12_11+h12_01+h12_10)/4
@@ -474,7 +451,7 @@ class ExpectationValueCalculation:
         Block2 = self.assemble_M_matrix_single_block(self.betas_p)
         Block3 = self.assemble_M_matrix_single_block(self.betas_pp)
         self.M_matrix = np.vstack((Block1, Block2, Block3)).reshape(24, 9)
-
+        
         return self.M_matrix
 
     def invert_M_matrix(self):
@@ -496,7 +473,7 @@ class ExpectationValueCalculation:
         self._calibrate_betas()
         self.assemble_M_matrix()
         self.inverse_matrix = np.linalg.pinv(self.M_matrix)
-
+        
         # use it to get terms back from RO
         rescaled_measurements_tomo = self.measurements_tomo
         self.expect_values = np.dot(self.inverse_matrix,
@@ -526,32 +503,3 @@ class ExpectationValueCalculation:
                                       self.expect_values[8]])
         expect_values_VQE = self.execute_error_signalling(expect_values_VQE)
         return expect_values_VQE
-
-
-    def plot_TV_mode(self, avg_h0, avg_h1, avg_h01):
-        figname = 'Tomography_Exp{}'.format(self.fig_format)
-        fig1, axs = plt.subplots(1, 3, figsize=(17, 4))
-        fig1.suptitle(self.exp_name+' ' + self.timestamp_string, size=16)
-        ax = axs[0]
-        # ax.plot(np.arange(self.nr_segments), avg_h0,
-        #         'o-')
-        ax.plot(np.arange(len(avg_h0)), avg_h0,
-                'o-')
-        ax.set_title('{}'.format(self.q0_label))
-        ax = axs[1]
-        # ax.plot(np.arange(self.nr_segments), avg_h1,
-        #         'o-')
-        ax.plot(np.arange(len(avg_h1)), avg_h1,
-                'o-')
-        ax.set_title('{}'.format(self.q1_label))
-        ax = axs[2]
-        # ax.plot(np.arange(self.nr_segments), avg_h01,
-        #         'o-')
-        ax.plot(np.arange(len(avg_h01)), avg_h01,
-                'o-')
-        ax.set_title('Correlations {}-{}'.format(self.q0_label, self.q1_label))
-        savename = os.path.abspath(os.path.join(
-            self.folder, figname))
-        # value of 450dpi is arbitrary but higher than default
-        fig1.savefig(savename, format=self.fig_format, dpi=300)
-        #plt.close(fig1)
