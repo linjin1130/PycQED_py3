@@ -1117,6 +1117,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         else:
             (ops, self.op_err, self.rho) = tomo.execute_pseudo_inverse_tomo()
             min_eig, min_eig_err = bootstrap_err_min_ev(ops,self.op_err)
+            self.min_eig, self.min_eig_err = min_eig,min_eig_err
             print('Min eigenval is {} +/- {} (95 \% conf.)'.format(min_eig,2*min_eig_err))
 
         # ops are in the wrong order. The following function gets them from
