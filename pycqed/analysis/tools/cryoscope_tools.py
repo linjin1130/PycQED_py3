@@ -134,20 +134,22 @@ class CryoscopeAnalyzer:
 
         # extract the phase. unwrapping only works well if demodulation is
         # good!
-        self.phase = np.unwrap(np.angle(self.demod_data))
+        # ADDED MINUS
+        self.phase = -np.unwrap(np.angle(self.demod_data))
 
         # extract frequency by a lowpass-derivative filter.
 
         # use a savitzky golay filter: it take sliding window of length
         # `window_length`, fits a polynomial, returns derivative at
         # middle point
+        # ADDED MINUS
         self.detuning = ss.savgol_filter(
             self.phase / (
                 2 * np.pi),
             window_length=self.derivative_window_size,
             polyorder=derivative_order,
             deriv=1) * self.sampling_rate
-        self.real_detuning = self.get_real_detuning(self.nyquist_order)
+        self.real_detuning = -self.get_real_detuning(self.nyquist_order)
 
     def get_real_detuning(self, nyquist_order=None):
         if nyquist_order is None:
@@ -160,7 +162,7 @@ class CryoscopeAnalyzer:
         """
         Converts the real detuning to amplitude
         """
-        real_detuning = self.get_real_detuning()
+        real_detuning = -self.get_real_detuning()
         if hasattr(self, 'freq_to_amp'):
 
             amplitudes = self.freq_to_amp(real_detuning)

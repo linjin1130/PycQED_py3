@@ -1401,6 +1401,7 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
         # self.HM.set_sources('Off')
         pass
 
+
 class FluxTrack(det.Soft_Detector):
     '''
     '''
