@@ -810,6 +810,7 @@ def rotated_bell_state(dummy_x, angle_MSQ, angle_LSQ,
     return state
 
 def get_min_ev(op_vec):
+    # input is op_vec list of 16 expectation values <sigma_ij>
     I = np.array([[1,0],[0,1]])
     Z = np.array([[1,0],[0,-1]])
     X = np.array([[0,1],[1,0]])
@@ -827,9 +828,19 @@ def sample_min_ev(op_avg, op_err):
     return get_min_ev(op_vec)
 
 def bootstrap_err_min_ev(op_avg, op_err, samples=1000):
+    # SAMPLES WERE NOT BEING USED?
+    min_ev = get_min_ev(op_avg)
     min_evs = [sample_min_ev(op_avg,op_err) for _ in range(samples)]
-    return np.mean(min_evs), np.std(min_evs)
+    print(abs(np.mean(min_evs)-min_ev))
+    assert(abs(np.mean(min_evs)-min_ev) < (1/np.sqrt(samples))) # COMPLAINING!!!!
+    return min_ev, np.std(min_evs)
 
+def sample_min_ev_debugging(rho):
+    return min(np.linalg.eigvalsh(rho.full()))
+
+def bootstrap_err_min_ev_debugging(op_avg, op_err, rho,samples=1000):
+    min_evs = [sample_min_ev_debugging(rho) for _ in range(samples)]
+    return np.mean(min_evs), np.std(min_evs)
 
 class Tomo_Multiplexed(ma.MeasurementAnalysis):
 
@@ -1116,9 +1127,15 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             (ops, self.rho) = tomo.execute_pseudo_inverse_tomo()
         else:
             (ops, self.op_err, self.rho) = tomo.execute_pseudo_inverse_tomo()
-            min_eig, min_eig_err = bootstrap_err_min_ev(ops,self.op_err)
+            # IS THIS NUM_MEASUREMENTS PUT PROPERLY??
+            min_eig, min_eig_err = bootstrap_err_min_ev(ops,self.op_err,
+                                                        samples=num_measurements)
             self.min_eig, self.min_eig_err = min_eig,min_eig_err
             print('Min eigenval is {} +/- {} (95 \% conf.)'.format(min_eig,2*min_eig_err))
+            min_eig, min_eig_err = bootstrap_err_min_ev_debugging(ops,self.op_err,
+                                                                  self.rho, samples=num_measurements)
+            self.min_eig = min_eig
+            print('Min eigenval FROM RHO is {} +/- {} (95 \% conf.)'.format(min_eig,2*min_eig_err))
 
         # ops are in the wrong order. The following function gets them from
         # the density matrix in the correct order:
