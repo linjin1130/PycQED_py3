@@ -1205,6 +1205,19 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             for i, op in enumerate(self.operators_fit):
                 pars_dict.update({op_string_vec[i]: op})
             print('Saving expectation values')
+            # saving errorbars and min eig
+            op_string_vec_err = ['II_err', 'IZ_err', 'IX_err', 'IY_err',
+                             'ZI_err', 'ZZ_err', 'ZX_err', 'ZY_err',
+                             'XI_err', 'XZ_err', 'XX_err', 'XY_err',
+                             'YI_err', 'YZ_err', 'YX_err', 'YY_err']
+            for i, op_e in enumerate(self.op_err):
+                pars_dict.update({op_string_vec_err[i]: op_e})
+            print('Saving errorbars')
+
+            pars_dict.update({'min_eig': self.min_eig})
+            pars_dict.update({'min_eig_err': self.min_eig_err})
+            print('Saving ming eigenvalue')
+
             self.save_dict_to_analysis_group(pars_dict, 'tomography_results')
         # only works if MLE and target bell were specified
         except Exception as e:
