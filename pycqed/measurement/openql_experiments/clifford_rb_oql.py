@@ -17,7 +17,7 @@ from pycqed.measurement.openql_experiments.multi_qubit_oql import \
     add_two_q_cal_points
 
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
-from pycqed.measurement.openql_experiments import openql_experiments as oqh
+from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group \
     import SingleQubitClifford, TwoQubitClifford
 base_qasm_path = join(dirname(__file__), 'qasm_files')

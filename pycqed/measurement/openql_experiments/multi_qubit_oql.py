@@ -2196,13 +2196,13 @@ def two_qubit_VQE_final(q0: int, q1: int, platf_cfg: str, wait_tau=0):
         if i<36:
             init_pulse = 'rx180'
             # init_pulse = 'ry90'
-            buffer_time = 680-60+120+20-40-3*idling_tau-40+40+40+40+40 #+40 from playing timings
+            buffer_time = 680-60+120+20-2*idling_tau-40+100+40+40+40 #+40 from playing timings
         else:
             init_pulse = 'i'
-            buffer_time = 680-60+120+20-40-3*idling_tau-40+40+40+40+40
+            buffer_time = 680-60+120+20-2*idling_tau-40+100+40+40+40
 
         if idling_tau>0:
-            buffer_time += 20
+            buffer_time -= 40#20
         else:
             buffer_time -= 20
         # put everything into the seq skeleton
@@ -2212,17 +2212,18 @@ def two_qubit_VQE_final(q0: int, q1: int, platf_cfg: str, wait_tau=0):
         k.prepz(q1)
         k.gate("wait", [q1,q0], buffer_time) # for fixed-point
         k.gate(init_pulse, q1) #Y180 gate without compilation
-        k.gate("wait", [q1,q0], idling_tau)
+        if idling_tau>0:
+            k.gate("wait", [q1,q0], idling_tau)
         # k.gate("wait", [q1,q0], 0)
         k.gate('fl_cw_02', 2, 0)
         # k.gate("wait", [q1,q0], 0)
-        k.gate("wait", [q1,q0], idling_tau)
+        if idling_tau>0:
+            k.gate("wait", [q1,q0], idling_tau)
         # k.gate("wait", [q1,q0], 140)
         # k.gate('i', q0) #compiled z gate+pre_rotation
         # k.gate('i', q1) #pre_rotation
         k.gate(p_q0, q0) #compiled z gate+pre_rotation
         k.gate(p_q1, q1) #pre_rotation
-        k.gate("wait", [q1,q0], idling_tau)
         k.measure(q0)
         k.measure(q1)
         if i<63:
