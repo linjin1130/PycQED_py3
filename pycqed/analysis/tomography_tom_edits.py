@@ -99,6 +99,7 @@ class TomoAnalysis_JointRO():
             coefficient_matrix, err_coefficient_matrix = data
         else:
             coefficient_matrix = data
+        self.debug_coefficient_matrix = coefficient_matrix
 
         basis_decomposition = np.zeros(4 ** self.n_qubits)
         err_decomposition = np.zeros(4 ** self.n_qubits)
@@ -421,13 +422,24 @@ class TomoAnalysis_JointRO():
             print('beta_{}'.format(quadrature),self.betas)
             for rotation_index in range(n_rotations):
                 for beta_index in range(2 ** self.n_qubits):
+                    # only adds the dominant beta
+                    # pays attention only to the dominant channel
+                    if (np.argmax(abs(self.betas))==beta_index):
+                        beta_to_put = self.betas[beta_index]
+                        if self.err_cal is not None:
+                            err_beta_to_put = self.err_betas[beta_index]
+                    else:
+                        beta_to_put = 0
+                        if self.err_cal is not None:
+                            err_beta_to_put = 0
+
                     (place, sign) = self._get_basis_index_from_rotation(
                         beta_index, rotation_index)
                     coefficient_matrix[
-                        n_rotations * quadrature + rotation_index, place] = sign * self.betas[beta_index]
+                        n_rotations * quadrature + rotation_index, place] = sign * beta_to_put
                     if self.err_cal is not None:
                         err_coefficient_matrix[
-                            n_rotations * quadrature + rotation_index, place] = self.err_betas[beta_index]
+                            n_rotations * quadrature + rotation_index, place] = err_beta_to_put
         if self.err_cal is not None:
             return coefficient_matrix, err_coefficient_matrix
         return coefficient_matrix
@@ -824,13 +836,20 @@ def get_min_ev(op_vec):
     return min(evs)
 
 def sample_min_ev(op_avg, op_err):
-    op_vec = [np.random.normal(loc=op_avgj, scale=op_errj) for op_avgj, op_errj in zip(op_avg, op_err)]
+    # print(op_err)
+    op_vec = []
+    for op_avgj, op_errj in zip(op_avg, op_err):
+        try:
+            op_vec.append(np.random.normal(loc=op_avgj, scale=op_errj))
+        except:
+            op_vec.append(op_avgj)
+    #op_vec = [np.random.normal(loc=op_avgj, scale=op_errj) for op_avgj, op_errj in zip(op_avg, op_err)]
     return get_min_ev(op_vec)
 
 def bootstrap_err_min_ev(op_avg, op_err, samples=1000):
     # SAMPLES WERE NOT BEING USED?
     min_ev = get_min_ev(op_avg)
-    min_evs = [sample_min_ev(op_avg,op_err) for _ in range(samples)]
+    min_evs = [sample_min_ev(op_avg,op_err) for _ in range(int(samples))]
     print(abs(np.mean(min_evs)-min_ev))
     # assert(abs(np.mean(min_evs)-min_ev) < (1/np.sqrt(samples))) # COMPLAINING!!!!
     return min_ev, np.std(min_evs)
@@ -839,7 +858,7 @@ def sample_min_ev_debugging(rho):
     return min(np.linalg.eigvalsh(rho.full()))
 
 def bootstrap_err_min_ev_debugging(op_avg, op_err, rho,samples=1000):
-    min_evs = [sample_min_ev_debugging(rho) for _ in range(samples)]
+    min_evs = [sample_min_ev_debugging(rho) for _ in range(int(samples))]
     return np.mean(min_evs), np.std(min_evs)
 
 class Tomo_Multiplexed(ma.MeasurementAnalysis):
@@ -905,7 +924,6 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             avg_h1 = self.measured_values[0]
             avg_h2 = self.measured_values[1]
             avg_h12 = self.measured_values[2]
-
         avg_h_list = [avg_h1, avg_h2, avg_h12]
         # Calculate error as standard error in Bernoulli variable
         err_avg_h_list = [avg_h * (1 - avg_h)/np.sqrt(num_measurements)
@@ -1035,13 +1053,19 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         # fac_h2 = std_arr_h1_h2_h12[index_of_dominant_channel]/std_h2
         # fac_h12 = std_arr_h1_h2_h12[index_of_dominant_channel]/std_h12
 
+        # DEACTIVATING NOISE SCALING HERE
 
         fac = np.mean([std_h1, std_h2, std_h12])
-        avg_h1 *= fac/std_h1
-        avg_h2 *= fac/std_h2
-        avg_h12 *= fac/std_h12
-        err_avg_h_list = [err_avg_h * fac / std_h for err_avg_h, std_h in zip(
-            err_avg_h_list, std_h_list)]
+        if ((std_h1!=0) and (std_h2!=0) and (std_h12!=0)):
+            avg_h1 *= fac/std_h1
+            avg_h2 *= fac/std_h2
+            avg_h12 *= fac/std_h12
+            err_avg_h_list = [err_avg_h * fac / std_h for err_avg_h, std_h in zip(
+                err_avg_h_list, std_h_list)]
+        else:
+            err_avg_h_list = [err_avg_h * 0 for err_avg_h, std_h in zip(
+                err_avg_h_list, std_h_list)]
+
 
         # print('########### FACTORS ###########')
         # print('factor 1',fac/std_h1)
@@ -1222,22 +1246,24 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                 pars_dict.update({op_string_vec[i]: op})
             print('Saving expectation values')
             # saving errorbars and min eig
-            op_string_vec_err = ['II_err', 'IZ_err', 'IX_err', 'IY_err',
-                             'ZI_err', 'ZZ_err', 'ZX_err', 'ZY_err',
-                             'XI_err', 'XZ_err', 'XX_err', 'XY_err',
-                             'YI_err', 'YZ_err', 'YX_err', 'YY_err']
-            for i, op_e in enumerate(self.op_err):
-                pars_dict.update({op_string_vec_err[i]: op_e})
-            print('Saving errorbars')
+            if not self.MLE:
+                op_string_vec_err = ['II_err', 'IZ_err', 'IX_err', 'IY_err',
+                                 'ZI_err', 'ZZ_err', 'ZX_err', 'ZY_err',
+                                 'XI_err', 'XZ_err', 'XX_err', 'XY_err',
+                                 'YI_err', 'YZ_err', 'YX_err', 'YY_err']
+                # print('Reached this point')
+                for i, op_e in enumerate(self.op_err):
+                    pars_dict.update({op_string_vec_err[i]: op_e})
+                print('Saving errorbars')
 
-            pars_dict.update({'min_eig': self.min_eig})
-            pars_dict.update({'min_eig_err': self.min_eig_err})
-            print('Saving ming eigenvalue')
+                pars_dict.update({'min_eig': self.min_eig})
+                pars_dict.update({'min_eig_err': self.min_eig_err})
+                print('Saving ming eigenvalue')
 
             self.save_dict_to_analysis_group(pars_dict, 'tomography_results')
         # only works if MLE and target bell were specified
         except Exception as e:
-            print(e)
+            print('exception on saving:',e)
 
         self.data_file.close()
 
