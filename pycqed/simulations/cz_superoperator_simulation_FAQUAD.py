@@ -935,14 +935,23 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         J2=self.fluxlutman.cz_J2()
         fundam_speedlimit=np.pi/(2*J2)
 
-
         Omega_initial=0
         Omega_final=w_q1-alpha_q0-w_q0
+
+
+        scalefactor=1e9
+        sim_step=sim_step*scalefactor
+        Omega_final=Omega_final/scalefactor
+        self.H_0=self.H_0/scalefactor
+
+
+        
         ctilde=fix_ctilde(self.H_0,Omega_initial,Omega_final)
         
 
         s_span=(0,1)
         Omega0=np.array([Omega_initial,])
+        t_eval=np.linspace(0,1,100001)
         def rhs_diffequ(t,Omega):
             dH_over_dOmega=H_c
             gap,psi11,psi02=gap_and_eigenvectors(self.H_0,Omega[0])
@@ -950,7 +959,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             if scalprod==0:
                 scalprod=1e-10
             return np.array([ctilde[0]*gap**2/scalprod,])
-        solution=scipy.integrate.solve_ivp(fun=rhs_diffequ, t_span=s_span, y0=Omega0)
+        solution=scipy.integrate.solve_ivp(fun=rhs_diffequ, t_span=s_span, y0=Omega0,rtol=1e-8,atol=1e-14,t_eval=t_eval)
 
 
 
@@ -980,6 +989,56 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         '''
 
 
+
+
+        '''# BENCHMARK EVOLUTION OF STATES DURING SINGLE PASSAGE
+        total_time=np.arange(1,252,50)
+        division_of_tlist=1000    # 1000 is good
+        tlist_partial=np.linspace(0,1,division_of_tlist)
+        eps_vec_FAQUAD_partial=rampup_forward(tlist_partial)
+        eigs_H0,eigvectors_H0=self.H_0.eigenstates()
+        x_plot = tlist_partial
+        c_ops=[]
+        
+
+        for T in total_time:
+            U_final=1
+            sim_step_temp=sim_step*T/division_of_tlist
+            adiabatic_infidelities=[[],[],[],[],[],[],[],[],[],[]]
+            variances=[[],[],[],[],[],[],[],[],[]]
+
+            for x_elements in range(np.size(tlist_partial)):
+                
+                H=self.H_0+eps_vec_FAQUAD_partial[x_elements]*H_c
+
+                initial_propagator=U_final
+                U_final=time_evolution(sim_step_temp,[eps_vec_FAQUAD_partial[x_elements]],self.H_0,c_ops,initial_propagator)
+                #U=qtp.propagator(H,sim_step_temp,c_ops)
+                #U_final=U*U_final
+
+                eigs,eigvectors=H.eigenstates()
+                infids=compute_adiabatic_infidelities(U_final,eigvectors,eigvectors_H0)
+                varsH=compute_variances(H,U_final,eigvectors_H0)
+
+                for i in range(9+1):
+                    adiabatic_infidelities[i].append(infids[i])
+                for i in range(9):    
+                    variances[i].append(varsH[i])
+
+            y_plot_a = np.array(adiabatic_infidelities[-1])
+            plt.plot(x_plot, y_plot_a, label='T: {}'.format(T))
+
+        plt.legend()
+        plt.title("Av_infid different total time")
+        plt.xlabel("s")
+        plt.ylabel("Av_infid")
+        plt.yscale('log')
+        plt.show()'''
+
+
+
+
+
         c_ops=[]
 
 
@@ -989,8 +1048,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         eigs_H0,eigvectors_H0=self.H_0.eigenstates()
 
 
-        subdivisions_of_simstep=1
-        rampuptime=np.arange(1,5001,1)
+        subdivisions_of_simstep=40   # 40 is good
+        rampuptime=np.arange(1,252,1)
 
         adiabatic_infidelities=[[],[],[],[],[],[],[],[],[],[]]
         variances=[[],[],[],[],[],[],[],[],[]]
@@ -1010,6 +1069,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
             initial_propagator=1
             U_final=time_evolution(sim_step_temp,eps_vec_FAQUAD,self.H_0,c_ops,initial_propagator)
+            #H_t = [self.H_0, [H_c, eps_vec_FAQUAD]]
+            #U_final=qtp.propagator(H_t,tlist_sim[-1],c_ops,nsteps=10000000000)
+
             infids=compute_adiabatic_infidelities(U_final,eigvectors,eigvectors_H0)
             varsH=compute_variances(H,U_final,eigvectors_H0)
 
@@ -1040,7 +1102,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
 
-        x_plot = rampuptime*sim_step*1e9
+        x_plot = rampuptime*sim_step
         #x_plot_b = 1-solution.t[::-1]
         for i in range(10):
            y_plot_a = np.array(adiabatic_infidelities_updown[i])
@@ -1055,7 +1117,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         plt.show()
 
 
-        x_plot = rampuptime*sim_step*1e9
+        x_plot = rampuptime*sim_step
         #x_plot_b = 1-solution.t[::-1]
         for i in range(1,9,1):
            y_plot_a = np.array(variances_updown[i])
@@ -1070,7 +1132,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         plt.show()
 
 
-        x_plot = rampuptime*sim_step*1e9
+        x_plot = rampuptime*sim_step
         #x_plot_b = 1-solution.t[::-1]
         for i in range(10):
            y_plot_a = np.array(phases_updown[i])
@@ -1088,7 +1150,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         #----------------------------------------------
 
 
-        x_plot = rampuptime*sim_step*1e9
+        x_plot = rampuptime*sim_step
         #x_plot_b = 1-solution.t[::-1]
         y_plot_a = np.array(cond_phases)
         #y_plot_b = solution.y[0][::-1]
@@ -1102,7 +1164,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         plt.show()
 
 
-        x_plot = rampuptime*sim_step*1e9
+        x_plot = rampuptime*sim_step
         #x_plot_b = 1-solution.t[::-1]
         y_plot_a = np.array(leakage)
         #y_plot_b = solution.y[0][::-1]
@@ -1116,7 +1178,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         plt.show()
 
 
-        x_plot = rampuptime*sim_step*1e9
+        x_plot = rampuptime*sim_step
         #x_plot_b = 1-solution.t[::-1]
         y_plot_a = np.array(avgateinfidpc)
         #y_plot_b = solution.y[0][::-1]
