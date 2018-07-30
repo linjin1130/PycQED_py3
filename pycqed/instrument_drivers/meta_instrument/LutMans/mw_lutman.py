@@ -310,6 +310,14 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             ' After the first program is uploaded, the value is set.',
             parameter_class=ManualParameter, initial_value=None,
             vals=vals.Ints())
+    
+    def _add_waveform_parameters(self):
+        super()._add_waveform_parameters()
+        # Parameters for a square pulse
+        self.add_parameter('sq_amp', unit='frac', vals=vals.Numbers(-1, 1),
+                           parameter_class=ManualParameter,
+                           initial_value=0.5)
+
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
@@ -328,6 +336,21 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                 AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair)))
         assert vals[0] == vals[1]
         return vals[0]
+
+    def generate_standard_waveforms(self):
+        wave_dict = super().generate_standard_waveforms(
+            apply_predistortion_matrix=False)
+        
+        wave_dict['square'] = wf.mod_square(
+            amp=self.sq_amp(),
+            length=self.mw_gauss_width()*4,  # to ensure same duration as mw
+            f_modulation=self.mw_modulation(),
+            sampling_rate=self.sampling_rate())
+
+        if self.mixer_apply_predistortion_matrix():
+            self._wave_dict = self.apply_mixer_predistortion_corrections(
+                self._wave_dict)
+        return self._wave_dict
 
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True, stop_start: bool = True,
@@ -354,7 +377,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             if 'channel_GI' in self.parameters:
                 awgs = [self.channel_GI()//2, self.channel_DI()//2]
             else:
-                awgs = [self.channel_I()]
+                awgs = [self.channel_I()//2]
             # Add if statemetn based on the hash here
             self.AWG.get_instr().upload_codeword_program(awgs=awgs)
 

@@ -267,6 +267,7 @@ def mod_gauss(amp, sigma_length, f_modulation, axis='x', phase=0,
     return pulse_I_mod, pulse_Q_mod
 
 
+
 def mod_gauss_VSM(amp, sigma_length, f_modulation, axis='x', phase=0,
                   nr_sigma=4,
                   motzoi=0, sampling_rate=2e8,
@@ -291,6 +292,18 @@ def mod_gauss_VSM(amp, sigma_length, f_modulation, axis='x', phase=0,
                                  sampling_rate=sampling_rate,
                                  Q_phase_delay=Q_phase_delay)
     return G_I_mod, G_Q_mod, D_I_mod, D_Q_mod
+
+def mod_square(amp, length, f_modulation,  phase=0,
+              motzoi=0, sampling_rate=1e9):
+    '''
+    Simple modulated gauss pulse. All inputs are in s and Hz.
+    '''
+    pulse_I, pulse_Q = block_pulse(amp, length=length,
+                                   sampling_rate=sampling_rate,
+                                   phase=phase)
+    pulse_I_mod, pulse_Q_mod = mod_pulse(pulse_I, pulse_Q, f_modulation,
+                                         sampling_rate=sampling_rate)
+    return pulse_I_mod, pulse_Q_mod
 
 
 def mod_square_VSM(amp_G, amp_D, length, f_modulation,

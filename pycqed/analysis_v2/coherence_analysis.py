@@ -339,7 +339,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
 
         assert (len(tau_keys) == len(labels))
         assert (len(tau_keys) == len(tau_std_keys))
-        assert (len(tau_keys) >= 3)
+        # assert (len(tau_keys) >= 3)
 
         req = (self.T1, self.T2, self.T2_star)
         if not all(k in tau_keys for k in req):

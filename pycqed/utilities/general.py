@@ -239,6 +239,7 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
     count = 0
     # Will try multiple times in case the last measurements failed and
     # created corrupt data files.
+    print(filepath)
     while success is False and count < 3:
         if filepath is None:
             folder = a_tools.get_folder(timestamp=timestamp, label=label,

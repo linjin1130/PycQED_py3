@@ -959,21 +959,17 @@ class CCLight_Transmon(Qubit):
                         self.mw_mixer_offs_GQ())
                 MW_LutMan.channel_amp(self.mw_amp180())
             else:
-                # case with VSM (both QWG and AWG8)
-                MW_LutMan.mw_amp180(self.mw_amp180())
-                MW_LutMan.G_mixer_phi(self.mw_G_mixer_phi())
-                MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
-                MW_LutMan.D_mixer_phi(self.mw_D_mixer_phi())
-                MW_LutMan.D_mixer_alpha(self.mw_D_mixer_alpha())
+                # case without VSM and with awg8
+                MW_LutMan.mw_amp180(1)
+                MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
+                MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
+                MW_LutMan.channel_amp(self.mw_amp180())
                 # N.B. This part is AWG8 specific
                 AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()-1),
                         self.mw_mixer_offs_GI())
                 AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+0),
                         self.mw_mixer_offs_GQ())
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+1),
-                        self.mw_mixer_offs_DI())
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+2),
-                        self.mw_mixer_offs_DQ())
+
 
         # 4. reloads the waveforms
         if do_prepare:
@@ -1043,7 +1039,7 @@ class CCLight_Transmon(Qubit):
         if using_VSM:
             motzois = gen_sweep_pts(start=0.2, stop=2.0, num=31)
         else:
-            motzois = gen_sweep_pts(center=0, span=.3, num=31)
+            motzois = gen_sweep_pts(center=0, span=.6, num=31)
 
         # large range
         a = self.measure_motzoi(MC=MC, motzoi_amps=motzois, analyze=True)
@@ -1155,8 +1151,21 @@ class CCLight_Transmon(Qubit):
                     self.mw_mixer_offs_GQ(offset_Q)
 
             else:
-                raise NotImplementedError(
-                    'VSM-less case not implemented without QWG.')
+                awg_ch = self.mw_awg_ch()
+                AWG.stop()
+                AWG.set('sigouts_{}_on'.format(awg_ch-1), 1)
+                AWG.set('sigouts_{}_on'.format(awg_ch+0), 1)
+                chGI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch-1)]
+                chGQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+0)]
+                offset_I, offset_Q = mixer_carrier_cancellation(
+                    SH=self.instr_SH.get_instr(),
+                    source=self.instr_LO_mw.get_instr(),
+                    MC=self.instr_MC.get_instr(),
+                    chI_par=chGI_par, chQ_par=chGQ_par,
+                    label='Mixer_offsets_drive_G'+self.msmt_suffix)
+                if update:
+                    self.mw_mixer_offs_GI(offset_I)
+                    self.mw_mixer_offs_GQ(offset_Q)
 
         return True
 
@@ -1191,27 +1200,37 @@ class CCLight_Transmon(Qubit):
         CCL.eqasm_program(p.filename)
         CCL.start()
 
-        # Open the VSM channel
-        VSM = self.instr_VSM.get_instr()
-        ch_in = self.mw_vsm_ch_in()
-        # module 8 is hardcoded for use mixer calls (signal hound)
-        VSM.set('mod8_marker_source'.format(ch_in), 'int')
-        VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
-        VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
-        VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
+        if self.cfg_with_vsm():
+          # Open the VSM channel
+          VSM = self.instr_VSM.get_instr()
+          ch_in = self.mw_vsm_ch_in()
+          # module 8 is hardcoded for use mixer calls (signal hound)
+          VSM.set('mod8_marker_source'.format(ch_in), 'int')
+          VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
+          VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
+          VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
+        else:
+          mixer_channels=['G']
 
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.mixer_apply_predistortion_matrix(True)
         # # Define the parameters that will be varied
         for mixer_ch in mixer_channels:
-            if mixer_ch == 'G':
-                mw_lutman.sq_G_amp(.5)
-                mw_lutman.sq_D_amp(0)
-            elif mixer_ch == 'D':
-                mw_lutman.sq_G_amp(0)
-                mw_lutman.sq_D_amp(.5)
-            alpha = mw_lutman.parameters['{}_mixer_alpha'.format(mixer_ch)]
-            phi = mw_lutman.parameters['{}_mixer_phi'.format(mixer_ch)]
+            if self.cfg_with_vsm():
+                alpha = mw_lutman.parameters['{}_mixer_alpha'.format(mixer_ch)]
+                phi = mw_lutman.parameters['{}_mixer_phi'.format(mixer_ch)]
+                if mixer_ch == 'G':
+                    mw_lutman.sq_G_amp(.5)
+                    mw_lutman.sq_D_amp(0)
+                elif mixer_ch == 'D':
+                    mw_lutman.sq_G_amp(0)
+                    mw_lutman.sq_D_amp(.5)
+            else:
+                alpha = mw_lutman.parameters['mixer_alpha']
+                phi = mw_lutman.parameters['mixer_phi']
+                mw_lutman.sq_amp(.5)
+
+
             spurious_sideband_freq = self.freq_qubit() - 2*self.mw_freq_mod()
             detector = det.Signal_Hound_fixed_frequency(
                 self.instr_SH.get_instr(), spurious_sideband_freq,
@@ -1863,6 +1882,7 @@ class CCLight_Transmon(Qubit):
         MC.run(name='rabi_'+self.msmt_suffix)
         ma.MeasurementAnalysis()
         ma.Rabi_Analysis(label='rabi_')
+        
         return True
 
     def measure_rabi_channel_amp(self, MC=None, amps=np.linspace(0, 1, 31),
@@ -1892,8 +1912,7 @@ class CCLight_Transmon(Qubit):
         if update_mw_lutman:
             a = ma.Rabi_Analysis(label='rabi')
             MW_LutMan.channel_amp(a.rabi_amplitudes['piPulse'])
-            if using_QWG:
-                self.mw_amp180(a.rabi_amplitudes['piPulse'])
+            self.mw_amp180(a.rabi_amplitudes['piPulse'])
         return True
 
     def measure_allxy(self, MC=None,
@@ -1965,41 +1984,56 @@ class CCLight_Transmon(Qubit):
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
 
-        if parameter_list is None:
-            parameter_list = ["freq_qubit", "mw_vsm_G_amp", "mw_vsm_D_amp"]
+        if self.cfg_with_vsm():
+            VSM = self.instr_VSM.get_instr()
+            mod_out = self.mw_vsm_mod_out()
+            ch_in = self.mw_vsm_ch_in()
+            G_amp_par = wrap_par_to_swf(
+                VSM.parameters['mod{}_ch{}_gaussian_amp'.format(
+                    mod_out, ch_in)], retrieve_value=True)
+            G_init = G_amp_par.get()
+            D_amp_par = wrap_par_to_swf(
+                VSM.parameters['mod{}_ch{}_derivative_amp'.format(
+                    mod_out, ch_in)], retrieve_value=True)
+            D_init = D_amp_par.get()
+            D_phase_par = wrap_par_to_swf(
+                VSM.parameters['mod{}_ch{}_derivative_phase'.format(
+                    mod_out, ch_in)], retrieve_value=True)
+            D_phase_init = D_phase_par.get()
+        else:
+            MW_LutMan = self.instr_LutMan_MW.get_instr()
+            G_amp_par = swf.lutman_par(LutMan=MW_LutMan,
+                                          LutMan_parameter=MW_LutMan.channel_amp)
+            G_init = self.mw_amp180()
+            D_amp_par = swf.lutman_par(LutMan=MW_LutMan,
+                                          LutMan_parameter=MW_LutMan.mw_motzoi)
+            D_init = self.mw_motzoi()
 
-        VSM = self.instr_VSM.get_instr()
-        mod_out = self.mw_vsm_mod_out()
-        ch_in = self.mw_vsm_ch_in()
-        G_amp_par = wrap_par_to_swf(
-            VSM.parameters['mod{}_ch{}_gaussian_amp'.format(
-                mod_out, ch_in)], retrieve_value=True)
-        D_amp_par = wrap_par_to_swf(
-            VSM.parameters['mod{}_ch{}_derivative_amp'.format(
-                mod_out, ch_in)], retrieve_value=True)
-        D_phase_par = wrap_par_to_swf(
-            VSM.parameters['mod{}_ch{}_derivative_phase'.format(
-                mod_out, ch_in)], retrieve_value=True)
 
         freq_par = self.instr_LO_mw.get_instr().frequency
 
         sweep_pars = []
+        init_values=[]
         for par in parameter_list:
             if par == 'G_amp':
                 sweep_pars.append(G_amp_par)
+                init_values.append(G_init)
             elif par == 'D_amp':
                 sweep_pars.append(D_amp_par)
+                init_values.append(D_init)
             elif par == 'D_phase':
                 sweep_pars.append(D_phase_par)
+                init_values.append(D_phase_init)
             elif par == 'freq':
                 sweep_pars.append(freq_par)
+                init_values.append(freq_par.get())
             else:
                 raise NotImplementedError(
                     "Parameter {} not recognized".format(par))
 
         if initial_values is None:
             # use the current values of the parameters being varied.
-            initial_values = [p.get() for p in sweep_pars]
+            initial_values = init_values
 
         # Preparing the sequence
         if restless:
@@ -2248,14 +2282,14 @@ class CCLight_Transmon(Qubit):
         suffix = 'depletion_time_{}_ro_pulse_type_{}_feedback_{}_net_gate_{}'.format(
             depletion_time, self.ro_pulse_type(), feedback, net_gate)
         MC.run(
-            'Measure_error_fraction_{}_{}'.format(self.msmt_suffix, suffix),
+            'erf_{}_{}'.format(self.msmt_suffix, suffix),
             exp_metadata=exp_metadata)
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
             a = ma2.Single_Qubit_RoundsToEvent_Analysis(
                 t_start=None, t_stop=None,
                 options_dict={'typ_data_idx': 0,
-                              'scan_label': 'error_fraction'},
+                              'scan_label': 'erf'},
                 extract_only=True)
             return a.proc_data_dict['frac_single']
 
@@ -2574,8 +2608,12 @@ class CCLight_Transmon(Qubit):
                 swf_func = swf.QWG_lutman_par(LutMan=MW_LutMan,
                                               LutMan_parameter=MW_LutMan.mw_motzoi)
             else:
-                raise NotImplementedError(
-                    'VSM-less case not implemented without QWG.')
+                if motzoi_amps is None:
+                    motzoi_amps = np.linspace(-.3, .3, 31)
+                swf_func = swf.lutman_par(LutMan=MW_LutMan,
+                                          LutMan_parameter=MW_LutMan.mw_motzoi)
+
+
 
         MC.set_sweep_function(swf_func)
         MC.set_sweep_points(motzoi_amps)
@@ -3121,7 +3159,8 @@ class CCLight_Transmon(Qubit):
                                    dephasing_sequence='ramsey'):
         # requires the cc light to have the readout time configured equal
         # to the measurement and depletion time + 60 ns buffer
-        # it requires an optimized depletion pulse
+        # it requires an optimized depletion pulse or 0 amplitude depletion pulses with the length
+        #accomodating for the natural depletion time
         amps_rel = np.linspace(0, 0.5, 11) if amps_rel is None else amps_rel
         self.cfg_prepare_ro_awg(True)
 
