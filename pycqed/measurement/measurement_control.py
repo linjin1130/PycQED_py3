@@ -189,7 +189,14 @@ class MeasurementControl(Instrument):
             self.save_MC_metadata(self.data_object)  # timing labels etc
             if exp_metadata is not None:
                 self.save_exp_metadata(exp_metadata, self.data_object)
-            return_dict = self.create_experiment_result_dict()
+            try:
+                return_dict = self.create_experiment_result_dict()
+            except:
+                print('MC HDF5 issue: Failed first try')
+                try:
+                    return_dict = self.create_experiment_result_dict()
+                except:
+                    print('MC HDF5 issue: Failed second try')
 
         self.finish(result)
         return return_dict

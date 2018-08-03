@@ -1266,7 +1266,7 @@ def add_two_q_cal_points(p, platf, q0: int, q1: int,
 
 
 def Chevron_first_manifold(qubit_idx: int, qubit_idx_spec: int,
-            buffer_time, buffer_time2, flux_cw: int, platf_cfg: str):
+            buffer_time, buffer_time2, flux_cw: int, platf_cfg: str, prep_11=False):
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -1294,7 +1294,8 @@ def Chevron_first_manifold(qubit_idx: int, qubit_idx_spec: int,
     k = Kernel("Chevron", p=platf)
     k.prepz(qubit_idx)
     k.gate('rx180', qubit_idx)
-    # k.gate('rx90', qubit_idx_spec)
+    if prep_11:
+            k.gate('rx180', qubit_idx_spec)
     k.gate("wait", [qubit_idx], buffer_nanoseconds)
     k.gate('fl_cw_{:02}'.format(flux_cw), 2, 0)
     k.gate('wait', [qubit_idx], buffer_nanoseconds2)
@@ -2196,10 +2197,10 @@ def two_qubit_VQE_final(q0: int, q1: int, platf_cfg: str, wait_tau=0):
         if i<36:
             init_pulse = 'rx180'
             # init_pulse = 'ry90'
-            buffer_time = 680-60+120+20-2*idling_tau-40+100+40+40+40 #+40 from playing timings
+            buffer_time = 680-60+120+20-40-2*idling_tau-40+100+40+40+40 #+40 from playing timings
         else:
             init_pulse = 'i'
-            buffer_time = 680-60+120+20-2*idling_tau-40+100+40+40+40
+            buffer_time = 680-60+120+20-40-2*idling_tau-40+100+40+40+40
 
         if idling_tau>0:
             buffer_time -= 40#20
@@ -2212,6 +2213,7 @@ def two_qubit_VQE_final(q0: int, q1: int, platf_cfg: str, wait_tau=0):
         k.prepz(q1)
         k.gate("wait", [q1,q0], buffer_time) # for fixed-point
         k.gate(init_pulse, q1) #Y180 gate without compilation
+        # k.gate(init_pulse, q0) # test for tomo-leak ERASE ME!
         if idling_tau>0:
             k.gate("wait", [q1,q0], idling_tau)
         # k.gate("wait", [q1,q0], 0)
@@ -2375,6 +2377,88 @@ def two_qubit_VQE_allmw(q0: int, q1: int, platf_cfg: str, wait_tau=0):
     with suppress_stdout():
         p.compile()
     # attribute is added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def AllXY_CORPSE(qubit_idx: int, other_q_idx: int,
+                 platf_cfg: str, double_points: bool=True,
+                 other_q_excited: bool=False):
+    """
+    Single qubit AllXY sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+        double_points:  if true repeats every element twice
+    Returns:
+        p:              OpenQL Program object containing
+
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="AllXY", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
+             ['rx180', 'ry180'], ['ry180', 'rx180'],
+             ['rx90', 'i'], ['ry90', 'i'], ['rx90', 'ry90'],
+             ['ry90', 'rx90'], ['rx90', 'ry180'], ['ry90', 'rx180'],
+             ['rx180', 'ry90'], ['ry180', 'rx90'], ['rx90', 'rx180'],
+             ['rx180', 'rx90'], ['ry90', 'ry180'], ['ry180', 'ry90'],
+             ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
+             ['ry90', 'ry90']]
+
+    corpse_decomp = {'i': ['cw_00','cw_00','cw_00'],
+                     'rx180': ['cw_01','cw_01','cw_01'],
+                     'rx90': ['cw_02','cw_03','cw_02'],
+                     # 'ry90': ['cw_04','cw_04','cw_04'],
+                     # 'ry180': ['cw_05','cw_06','cw_05']}
+                     'ry180': ['cw_04','cw_01','cw_07'],
+                     'ry90': ['cw_05','cw_06','cw_05']}
+    # this should be implicit
+    p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
+
+    if other_q_excited:
+        other_q_pulse = 'rx180'
+    else:
+        other_q_pulse = 'cw_00'
+
+    for i, xy in enumerate(allXY):
+        if double_points:
+            js = 2
+        else:
+            js = 1
+        for j in range(js):
+            k = Kernel("AllXY_"+str(i+j/2), p=platf)
+            k.prepz(qubit_idx)
+            k.prepz(other_q_idx)
+            # k.gate('fl_cw_02', 2, 0)
+            # k.gate("wait", [qubit_idx,], 0)
+            xy_gate_corpse_0 = corpse_decomp[xy[0]]
+            xy_gate_corpse_1 = corpse_decomp[xy[1]]
+
+            k.gate('cw_00', qubit_idx)
+            k.gate(other_q_pulse, other_q_idx)
+
+            k.gate(xy_gate_corpse_0[0], qubit_idx)
+            k.gate(xy_gate_corpse_0[1], qubit_idx)
+            k.gate(xy_gate_corpse_0[2], qubit_idx)
+            k.gate(xy_gate_corpse_1[0], qubit_idx)
+            k.gate(xy_gate_corpse_1[1], qubit_idx)
+            k.gate(xy_gate_corpse_1[2], qubit_idx)
+
+            k.gate('cw_00', qubit_idx)
+            k.gate(other_q_pulse, other_q_idx)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+
+    with suppress_stdout():
+        p.compile(verbose=False)
+    # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p

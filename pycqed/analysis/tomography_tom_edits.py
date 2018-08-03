@@ -369,12 +369,39 @@ class TomoAnalysis_JointRO():
             correctly (00, 01, 10, 11) for 2 qubits
         """
         cal_matrix = np.zeros((self.n_states, self.n_states))
+        """
         # get the coefficient matrix for the betas
         for i in range(self.n_states):
             for j in range(self.n_states):
                 # perform bitwise AND and count the resulting 1s
                 cal_matrix[i, j] = (-1)**(bin((i & j)).count("1"))
         # invert solve the simple system of equations
+        """
+        # Attempt to compensate for res. exc.
+        p_00 = qtp.Qobj(np.diag([1-self.res_exc_Q1-self.res_exc_Q0-self.res_exc_Q1*self.res_exc_Q0,self.res_exc_Q0,self.res_exc_Q1,self.res_exc_Q1*self.res_exc_Q0]),
+                           dims=[[2,2],[2,2]])
+        p_01 = qtp.Qobj(np.diag([self.res_exc_Q0, 1-self.res_exc_Q1-self.res_exc_Q0-self.res_exc_Q1*self.res_exc_Q0, self.res_exc_Q1*self.res_exc_Q0, self.res_exc_Q1]),
+                           dims=[[2,2],[2,2]])
+        p_10 = qtp.Qobj(np.diag([self.res_exc_Q1, self.res_exc_Q1*self.res_exc_Q0, 1-self.res_exc_Q1-self.res_exc_Q0-self.res_exc_Q1*self.res_exc_Q0, self.res_exc_Q0]),
+                           dims=[[2,2],[2,2]])
+        p_11 = qtp.Qobj(np.diag([self.res_exc_Q1*self.res_exc_Q0,self.res_exc_Q1,self.res_exc_Q0,1-self.res_exc_Q1-self.res_exc_Q0-self.res_exc_Q1*self.res_exc_Q0]),
+                           dims=[[2,2],[2,2]])
+        rho_vec = [p_00, p_01, p_10, p_11]
+        mmt_sigmas = [qtp.tensor(qtp.qeye(2),qtp.qeye(2)),
+                      qtp.tensor(qtp.qeye(2),qtp.sigmaz()),
+                      qtp.tensor(qtp.sigmaz(),qtp.qeye(2)),
+                      qtp.tensor(qtp.sigmaz(),qtp.sigmaz())]
+        # row of cal_matrix
+        for i in range(self.n_states):
+            # calculate rho_i
+            rho_i = rho_vec[i]
+            # column of cal_matrix
+            for j in range(self.n_states):
+                # calculate sigma_j
+                sigma_j = mmt_sigmas[j]
+                # cal_matrix[i,j] = tr(rho_i sigma_j)
+                cal_matrix[i, j] = (rho_i*sigma_j).tr()
+        #"""
         betas = np.dot(np.linalg.inv(cal_matrix), measurements_cal)
         if err_cal is not None:
             err_betas = np.sqrt((np.linalg.inv(cal_matrix)**2) @
@@ -424,14 +451,17 @@ class TomoAnalysis_JointRO():
                 for beta_index in range(2 ** self.n_qubits):
                     # only adds the dominant beta
                     # pays attention only to the dominant channel
-                    if (np.argmax(abs(self.betas))==beta_index):
-                        beta_to_put = self.betas[beta_index]
-                        if self.err_cal is not None:
-                            err_beta_to_put = self.err_betas[beta_index]
-                    else:
-                        beta_to_put = 0
-                        if self.err_cal is not None:
-                            err_beta_to_put = 0
+                    beta_to_put = self.betas[beta_index]
+                    if self.err_cal is not None:
+                        err_beta_to_put = self.err_betas[beta_index]
+                    # if (np.argmax(abs(self.betas))==beta_index):
+                    #     beta_to_put = self.betas[beta_index]
+                    #     if self.err_cal is not None:
+                    #         err_beta_to_put = self.err_betas[beta_index]
+                    # else:
+                    #     beta_to_put = 0
+                    #     if self.err_cal is not None:
+                    #         err_beta_to_put = 0
 
                     (place, sign) = self._get_basis_index_from_rotation(
                         beta_index, rotation_index)
@@ -891,7 +921,13 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         #     self.run_default_analysis()
 
     def run_default_analysis(self, num_measurements=1e4, **kw):
-        self.get_naming_and_values()
+        use_fake_data = kw.pop('use_fake_data', False)
+        if use_fake_data:
+            self.measured_values = kw.pop('fake_data',False)
+            if self.measured_values is False:
+                raise ValueError('Indicated that tomo will run on fake data, but did not provide valid one!')
+        else:
+            self.get_naming_and_values()
         # hard coded number of segments for a 2 qubit state tomography
         # constraint imposed by UHFLI
         self.nr_segments = 64
@@ -924,7 +960,23 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             avg_h1 = self.measured_values[0]
             avg_h2 = self.measured_values[1]
             avg_h12 = self.measured_values[2]
-        avg_h_list = [avg_h1, avg_h2, avg_h12]
+
+        if kw.pop('correct_leakage',False):
+            print('Correcting for leakage!')
+            p_leak = kw.pop('p_leak',0)
+            def correct_for_leakage(data, leak_meas):
+                for i in range(36):
+                    data[i] = (data[i] - leak_meas * p_leak)/(1-p_leak)
+                return np.array(data)
+            avg_h1 = correct_for_leakage(avg_h1,0)
+            avg_h2 = correct_for_leakage(avg_h2,1),
+            avg_h12 = correct_for_leakage(avg_h12, 1)
+            avg_h1 = avg_h1[0] if isinstance(avg_h1,tuple) else avg_h1
+            avg_h2 = avg_h2[0] if isinstance(avg_h2,tuple) else avg_h2
+            avg_h12 = avg_h12[0] if isinstance(avg_h12,tuple) else avg_h12
+        avg_h_list = [avg_h1,
+                      avg_h2,
+                      avg_h12]
         # Calculate error as standard error in Bernoulli variable
         err_avg_h_list = [avg_h * (1 - avg_h)/np.sqrt(num_measurements)
                           for avg_h in avg_h_list]
@@ -1141,6 +1193,9 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             err_cal=err_cal, err_tomo=err_tomo,
             n_qubits=2, n_quadratures=3,
             check_labels=(self.verbose > 0))
+        # residual excitations
+        tomo.res_exc_Q0 = kw.pop('res_exc_Q0', 0)
+        tomo.res_exc_Q1 = kw.pop('res_exc_Q1', 0)
         self.tomo = tomo
 
         self.meas_op_labels = np.concatenate(
@@ -1446,3 +1501,5 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         fig2.savefig(savename, format=self.fig_format, dpi=450)
         if self.close_fig:
             plt.close(fig2)
+
+

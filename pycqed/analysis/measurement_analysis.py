@@ -136,7 +136,10 @@ class MeasurementAnalysis(object):
 
     def finish(self, close_file=True, **kw):
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
 
     def analysis_h5data(self, name='analysis'):
         if not os.path.exists(os.path.join(self.folder, name + '.hdf5')):
@@ -590,7 +593,10 @@ class MeasurementAnalysis(object):
         self.save_fig(fig, fig_tight=True, **kw)
 
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
 
     def get_naming_and_values(self):
         '''
@@ -928,7 +934,10 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
         self.get_naming_and_values()
         self.make_figures(**kw)
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return
 
     def make_figures(self, **kw):
@@ -1097,7 +1106,10 @@ class OptimizationAnalysis(MeasurementAnalysis):
         self.optimization_result = (self.sweep_points[:, -1],
                                     self.measured_values[:, -1])
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
 
 
 class TD_Analysis(MeasurementAnalysis):
@@ -1248,7 +1260,10 @@ class TD_Analysis(MeasurementAnalysis):
                                   **kw)
 
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return
 
     def normalize_data_to_calibration_points(self, values, calsteps,
@@ -1808,7 +1823,10 @@ class Rabi_Analysis(TD_Analysis):
                               separate_fits=separate_fits)
 
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
 
         return self.fit_result
 
@@ -2136,7 +2154,10 @@ class Echo_analysis(TD_Analysis):
         self.fit_data(**kw)
         self.make_figures(**kw)
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return self.fit_res
         pass
 
@@ -2261,7 +2282,10 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         self.make_figures(**kw)
 
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
 
     def sort_data(self):
         self.x_exc = self.sweep_points[1::2]
@@ -2407,7 +2431,10 @@ class Motzoi_XY_analysis(TD_Analysis):
         opt_motzoi = self.calculate_optimal_motzoi()
 
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return opt_motzoi
 
     def make_figures(self, **kw):
@@ -2581,7 +2608,10 @@ class QScale_Analysis(TD_Analysis):
                               figname=self.measurementstring + '_Qscale_fit', **kw)
 
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
 
         return self.fit_res
 
@@ -2932,7 +2962,10 @@ class Rabi_Analysis_old(TD_Analysis):
             plt.show()
         self.save_fig(fig, figname=self.sweep_name + 'Rabi_fit', **kw)
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return fit_res
 
     def calculate_drive_scaling_factor(self, frequency):
@@ -3895,7 +3928,10 @@ class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
         self.make_figures(hist=hist, centers=centers, **kw)
 
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return
 
     def get_naming_and_values(self):
@@ -4116,7 +4152,10 @@ class T1_Analysis(TD_Analysis):
             self.save_fig(self.fig, figname=self.measurementstring + '_Fit', **kw)
 
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
 
         return self.fit_res
 
@@ -4392,7 +4431,10 @@ class Ramsey_Analysis(TD_Analysis):
                   '(' + 'μ' + unit + ')')
 
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
 
         return self.fit_res
 
@@ -4633,7 +4675,10 @@ class DragDetuning_Analysis(TD_Analysis):
 
         self.save_fig(fig, figname=self.measurementstring, **kw)
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return (self.detuning, self.XpY90, self.YpX90)
 
 
@@ -4714,7 +4759,10 @@ class TransientAnalysis(TD_Analysis):
 
         self.save_fig(fig, figname=self.measurementstring, **kw)
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return
 
 
@@ -4821,7 +4869,10 @@ class DriveDetuning_Analysis(TD_Analysis):
         # plt.show()
         self.save_fig(fig, figname=self.measurementstring + '_fit', **kw)
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return self.drive_scaling_factor
 
 
@@ -4973,7 +5024,10 @@ class AllXY_Analysis(TD_Analysis):
             self.make_figures(ideal_data=ideal_data,
                               close_main_fig=close_main_fig, **kw)
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return self.deviation_total
 
     def make_figures(self, ideal_data, close_main_fig, **kw):
@@ -5068,7 +5122,10 @@ class FFC_Analysis(TD_Analysis):
             self.make_figures(ideal_data=ideal_data,
                               close_main_fig=close_main_fig, **kw)
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return self.deviation_total
 
     def make_figures(self, ideal_data, close_main_fig, **kw):
@@ -5151,7 +5208,10 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
             self.make_figures(close_main_fig=close_main_fig, **kw)
 
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return
 
     def calc_T1_limited_fidelity(self, T1, pulse_delay):
@@ -5300,7 +5360,10 @@ class RB_double_curve_Analysis(RandomizedBenchmarking_Analysis):
             self.make_figures(n_cl, data_0, data_1, data_2,
                               close_main_fig=close_main_fig, **kw)
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return
 
     def fit_data(self, data0, data1, numCliff,
@@ -5774,7 +5837,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         # self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return fit_res
 
 
@@ -5988,7 +6054,10 @@ class Hanger_Analysis_CosBackground(MeasurementAnalysis):
             plt.show()
         self.save_fig(fig, xlabel=self.xlabel, ylabel='Power', **kw)
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         return fit_res
 
 
@@ -6398,7 +6467,10 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         self.save_fig(fig_dist, figname='Source frequency distance', **kw)
 
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
 
     def get_frequency_estimate(self, peak=False):
         best_fit = self.get_best_fit_results(peak=peak)
@@ -6458,7 +6530,10 @@ class Mixer_Calibration_Analysis(MeasurementAnalysis):
 
         self.save_fig(fig, xlabel=self.xlabel, ylabel='Power', **kw)
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
 
 
 class Qubit_Characterization_Analysis(MeasurementAnalysis):
@@ -7360,7 +7435,10 @@ class butterfly_analysis(MeasurementAnalysis):
                                               data=self.data_rel,
                                               one_larger_than_threshold=case)
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
         if auto is True:
             self.run_default_analysis(**kw)
 
@@ -7752,7 +7830,10 @@ class DoubleFrequency(TD_Analysis):
         ax.plot(plot_x[:-4] * 1e6, self.fit_plot, '-')
         fig.tight_layout()
         self.save_fig(fig, **kw)
-        self.data_file.close()
+        try:
+            self.data_file.close()
+        except:
+            print('Tomo: HDF5 error closing file')
         return self.fit_res
 
     def fit(self, sweep_values, measured_values):
@@ -7960,7 +8041,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                                         y0=filt_func_y0,
                                         filter_idx_low=filter_idx_low,
                                         filter_idx_high=filter_idx_high,
-                                        force_keep_idx_low=force_keep_idx_low, 
+                                        force_keep_idx_low=force_keep_idx_low,
                                         force_keep_idx_high=force_keep_idx_high,
                                         filter_threshold=filter_threshold)
         filt_flux_low, filt_flux_high, filt_peaks_low, filt_peaks_high, \
@@ -8040,7 +8121,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         filter_mask_low = np.where(
             peaks_low > filter_func(flux), False, filter_mask_low)
         filter_mask_low[filter_idx_low] = False  # hand remove 2 datapoints
-        filter_mask_low[force_keep_idx_low] = True  
+        filter_mask_low[force_keep_idx_low] = True
 
         filt_flux_low = flux[filter_mask_low]
         filt_peaks_low = peaks_low[filter_mask_low]
@@ -8252,7 +8333,10 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                 self.run_dac_arc_analysis(make_fig=make_fig)
 
         if close_file:
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
 
     def normalize(self, trace):
         # * -1 because cos starts at -1 instead of 1
@@ -8915,7 +8999,10 @@ class CZ_1Q_phase_analysis(TD_Analysis):
             self.make_figures()
 
         if kw.get('close_file', True):
-            self.data_file.close()
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
 
     def make_figures(self, **kw):
         xfine = np.linspace(self.x_points[0], self.x_points[-1], 100)

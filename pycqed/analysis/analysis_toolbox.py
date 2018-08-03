@@ -299,7 +299,10 @@ def get_data_from_timestamp_legacy(timestamps, param_names, TwoD=False, max_file
                 else:
                     warnings.warn(
                         'This data file attribute does not exist or hasn''t been coded for extraction.')
-        ma.data_file.close()
+        try:
+            ma.data_file.close()
+        except:
+            print('Tomo: HDF5 error closing file')
     return data
 
 

@@ -1084,8 +1084,14 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         # only works if MLE and target bell were specified
         except Exception as e:
             print(e)
-
-        self.data_file.close()
+        try:
+            self.data_file.close()
+        except:
+            print('Tomo: HDF5 error closing file')
+            try:
+                self.data_file.close()
+            except:
+                print('Tomo: HDF5 error closing file')
 
     def plot_TV_mode(self, avg_h0, avg_h1, avg_h01):
 
