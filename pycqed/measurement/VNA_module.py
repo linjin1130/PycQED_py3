@@ -160,6 +160,25 @@ def acquire_linear_frequency_span_vs_power(file_name, start_freq=None,
 #     ma.Homodyne_Analysis(auto=True, label=file_name, fitting_model='hanger')
     ma.TwoD_Analysis(auto=True, label=file_name)
 
+
+def acquire_disjoint_frequency_traces(file_name, list_freq_ranges,
+                                      power=-20,
+                                      bandwidth=100, measure='S21'):
+    """
+    list_freq_ranges is a list that contains the arays defining all the ranges of interest.
+    """
+    for idx, range_array in enumerate(list_freq_ranges):
+        this_file = file_name + '_%d'%idx
+        acquire_single_linear_frequency_span(file_name = this_file,
+                                             start_freq=range_array[0],
+                                             stop_freq=range_array[-1],
+                                             nbr_points=len(range_array),
+                                             power=power,
+                                             bandwidth=bandwidth,
+                                             measure=measure)
+    packing_mmts(file_name, labels=file_name+'__', N=len(list_freq_ranges))
+
+
 def acquire_2D_linear_frequency_span_vs_param(file_name, start_freq=None,
                                      stop_freq=None, center_freq=None,
                                      parameter=None, sweep_vector=None,
