@@ -159,7 +159,7 @@ class HeterodyneInstrument(Instrument):
                 IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
 
         if self._UHFQC_awg_parameters_changed and self.auto_seq_loading():
-            self._acquisition_instr.awg_sequence_acquisition()
+            # self._acquisition_instr.awg_sequence_acquisition() # Dirty hack to get the UHFLI to cooperate
             self._UHFQC_awg_parameters_changed = False
 
         # this sets the result to integration and rotation outcome
@@ -254,7 +254,7 @@ class HeterodyneInstrument(Instrument):
             self.prepare()
 
         dataset = self._acquisition_instr.acquisition_poll(
-            samples=1, acquisition_time=0.001, timeout=10)
+            samples=1, acquisition_time=0.001) # timeout=10 throws an error!
         dat = (self.scale_factor_UHFQC*dataset[0][0] +
                self.scale_factor_UHFQC*1j*dataset[1][0])
         return dat
