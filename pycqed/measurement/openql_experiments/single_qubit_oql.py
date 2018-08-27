@@ -916,3 +916,62 @@ def Echo_artificial_det(times, qubit_idx: int, platf_cfg: str):
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
+
+
+
+def depletion_allxy(qubit_idx: int,
+                        platf_cfg: str,
+                        double_points: bool=True,
+                        wait_after_init_mmt=0):
+    """
+    Sequence were allxy is used to observe remanent photons after mmt.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+        double_points:  if true repeats every element twice
+    Returns:
+        p:              OpenQL Program object containing
+
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="AllXY", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
+             ['rx180', 'ry180'], ['ry180', 'rx180'],
+             ['rx90', 'i'], ['ry90', 'i'], ['rx90', 'ry90'],
+             ['ry90', 'rx90'], ['rx90', 'ry180'], ['ry90', 'rx180'],
+             ['rx180', 'ry90'], ['ry180', 'rx90'], ['rx90', 'rx180'],
+             ['rx180', 'rx90'], ['ry90', 'ry180'], ['ry180', 'ry90'],
+             ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
+             ['ry90', 'ry90']]
+
+    # this should be implicit
+    p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
+    wait_ns = int(wait_after_init_mmt // 1e-9)
+    for i, xy in enumerate(allXY):
+        if double_points:
+            js = 2
+        else:
+            js = 1
+        for j in range(js):
+            k = Kernel("AllXY_"+str(i+j/2), p=platf)
+            k.prepz(qubit_idx)
+            k.measure(qubit_idx)
+            k.gate("wait", [qubit_idx,], wait_ns)
+            k.gate(xy[0], qubit_idx)
+            k.gate(xy[1], qubit_idx)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+
+    with suppress_stdout():
+        p.compile(verbose=False)
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
