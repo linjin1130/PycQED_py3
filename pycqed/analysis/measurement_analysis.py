@@ -9141,10 +9141,10 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         plt.ylabel('Demodulated voltage (V)')
 
         if optimization_window != None:
-            plt.axvline(optimization_start * 1e9, linestyle='--',
+            plt.axvline(optimization_start, linestyle='--',
                         color='k', label='depletion optimization window')
-            plt.axvline(optimization_stop * 1e9, linestyle='--', color='k')
-        ax.set_xlim(0, 1500)
+            plt.axvline(optimization_stop, linestyle='--', color='k')
+        #ax.set_xlim(0, 2000e)
         plt.legend()
 
         plt.savefig(data_file.folder + '\\' +
@@ -9159,10 +9159,10 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         plt.xlabel('time (ns)')
         plt.ylabel('Demodulated Q')
         if optimization_window != None:
-            plt.axvline(optimization_start * 1e9, linestyle='--',
+            plt.axvline(optimization_start, linestyle='--',
                         color='k', label='depletion optimization window')
-            plt.axvline(optimization_stop * 1e9, linestyle='--', color='k')
-        ax.set_xlim(0, 1500)
+            plt.axvline(optimization_stop, linestyle='--', color='k')
+        #ax.set_xlim(0, 2000e-9)
         plt.legend()
 
         plt.savefig(data_file.folder + '\\' +
@@ -9173,10 +9173,10 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         plt.plot(x, power0 * 1e6, label='ground', lw=4)
         plt.plot(x, power1 * 1e6, label='excited', lw=4)
         if optimization_window != None:
-            plt.axvline(optimization_start * 1e9, linestyle='--',
+            plt.axvline(optimization_start, linestyle='--',
                         color='k', label='depletion optimization window')
-            plt.axvline(optimization_stop * 1e9, linestyle='--', color='k')
-        ax.set_xlim(0, 1500)
+            plt.axvline(optimization_stop, linestyle='--', color='k')
+        #ax.set_xlim(0, 2000e)
         plt.title('Signal power (uW)')
         plt.ylabel('Signal power (uW)')
 
