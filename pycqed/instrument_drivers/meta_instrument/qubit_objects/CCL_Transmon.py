@@ -1464,7 +1464,8 @@ class CCLight_Transmon(Qubit):
                            cases=('off', 'on'),
                            prepare: bool=True, depletion_analysis: bool=True,
                            depletion_analysis_plot: bool=True,
-                           depletion_optimization_window=None):
+                           depletion_optimization_window=None,
+                           disable_snapshot_metadata=False):
         # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1503,7 +1504,8 @@ class CCLight_Transmon(Qubit):
                 sampling_rate)
             MC.set_detector_function(self.input_average_detector)
             data = MC.run(
-                'Measure_transients{}_{}'.format(self.msmt_suffix, i))
+                'Measure_transients{}_{}'.format(self.msmt_suffix, i),
+                disable_snapshot_metadata=disable_snapshot_metadata)
             dset = data['dset']
             transients.append(dset.T[1:])
             if analyze:
@@ -1923,7 +1925,8 @@ class CCLight_Transmon(Qubit):
     def calibrate_depletion_pulse_transients(
             self, nested_MC=None, amp0=None,
             amp1=None, phi0=180, phi1=0, initial_steps=None, two_par=True,
-            depletion_optimization_window=None, depletion_analysis_plot=False):
+            depletion_optimization_window=None, depletion_analysis_plot=False,
+            disable_snapshot_metadata=False):
         """
         this function automatically tunes up a two step, four-parameter
         depletion pulse.
@@ -1978,7 +1981,9 @@ class CCLight_Transmon(Qubit):
                                            'depletion_analysis_plot':
                                            depletion_analysis_plot,
                                            'depletion_optimization_window':
-                                           depletion_optimization_window},
+                                           depletion_optimization_window,
+                                           'disable_snapshot_metadata':
+                                           disable_snapshot_metadata},
                                   value_names=['depletion cost'],
                                   value_units=['au'],
                                   result_keys=['depletion_cost'])
