@@ -1,0 +1,29 @@
+FROM continuumio/miniconda3:latest
+MAINTAINER Viacheslav Ostroukh <V.Ostroukh@tudelft.nl>
+
+# make our environment sane
+ENV LANG C.UTF-8
+ENV LC_ALL C.UTF-8
+
+RUN conda config --add channels conda-forge && \
+    conda update --all && \
+    conda install --yes \
+        numpy \
+        scipy \
+        pyopengl \
+        pytest \
+        flake8 \
+        six \
+        coverage \
+        matplotlib \
+        cython \
+        pygraphviz \
+        pyqt && \
+    conda clean --all --yes && \
+    pip install --upgrade pip
+
+
+#ADD 3rdparty/OpenQL /src/OpenQL
+#RUN cd /src/OpenQL && \
+#    pip install . && \
+#    rm -rf /src/OpenQL
